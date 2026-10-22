@@ -1,0 +1,37 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+
+# Data and Artifacts (Strictly keep out of Git per Blueprint)
+data/raw/
+data/interim/
+data/processed/
+data/checkpoints/
+data/container_runs/
+artifacts/
+runs/
+*.fits
+*.h5
+*.tfrecord
+*.npz
+*.tar.gz
+*.tar.xz
+
+# Exception for test fixtures
+!data/fixtures/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+push_to_git.ps1

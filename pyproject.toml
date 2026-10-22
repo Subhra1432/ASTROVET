@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "astrovet"
+version = "0.1.0"
+description = "ASTROVET: Hybrid, Explainable Framework for TESS Transit-Candidate Vetting and Prioritization"
+readme = "README.md"
+authors = [
+    { name = "ASTROVET Contributors" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "scipy>=1.10.0",
+    "astropy>=5.0.0",
+    "lightkurve>=2.4.0",
+    "astroquery>=0.4.6",
+    "scikit-learn>=1.2.0",
+    "matplotlib>=3.7.0",
+    "pydantic>=2.0.0",
+    "pyarrow>=12.0.0",
+    "click>=8.0.0",
+    "pyyaml>=6.0.0",
+    "jinja2>=3.1.0",
+    "transitleastsquares>=2.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0"
+]
+
+[project.scripts]
+astrovet = "astrovet.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"astrovet.ui" = ["static/*.html"]
