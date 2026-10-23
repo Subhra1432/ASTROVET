@@ -1,0 +1,24 @@
+split:
+  group_by: tic_id
+  fractions:
+    train: 0.60
+    val: 0.15
+    cal: 0.10
+    test: 0.15
+  random_seed: 42
+ablations:
+  - id: B0
+    name: "NASA ExoMiner++ Baseline Alone"
+    inputs: ["baseline"]
+  - id: B1
+    name: "Supervised Head + Physics Diagnostics"
+    inputs: ["physics", "quality"]
+  - id: B2
+    name: "Baseline + SSL Representation"
+    inputs: ["baseline", "ssl"]
+  - id: B3
+    name: "Full ASTROVET Hybrid"
+    inputs: ["baseline", "physics", "ssl", "quality"]
+metrics:
+  ranking: ["pr_auc", "roc_auc", "recall_at_p90", "precision_at_20"]
+  calibration: ["brier_score", "expected_calibration_error"]

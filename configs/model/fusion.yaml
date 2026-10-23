@@ -1,0 +1,11 @@
+model_type: late_fusion_logistic
+regularization_c: 1.0
+calibration:
+  method: platt_scaling
+  partition: cal
+decision_thresholds:
+  planet_like_min_prob: 0.70
+  false_positive_max_prob: 0.30
+  uncertainty_review_threshold: 0.40
+  odd_even_significance_sigma: 3.0
+  secondary_detection_ratio: 0.08

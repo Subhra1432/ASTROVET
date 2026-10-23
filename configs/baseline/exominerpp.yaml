@@ -1,0 +1,12 @@
+model_name: "ExoMiner++ (TESS 2-min S1-S67)"
+release_tag: v1.0.0
+release_commit: d877a23
+source_repository: https://github.com/nasa/ExoMiner
+reference_paper: "arXiv:2502.09790 / AJ 170, 5"
+data_record_doi: "10.5281/zenodo.15466293"
+sectors: 1-67
+cadence: 2-minute
+adapter_scope: catalog_lookup_and_synthetic_fixture
+catalog_path: ../ExoMiner-main/exominer_vetting_pc_catalog_dash-render-web-app/data/exominer_vetting_tess-spoc-2-min-s1s67_dashtable_dvm-url_scoregt0.1.csv
+allow_synthetic_fallback: true
+audit_checkpoint_overlap: true

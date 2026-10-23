@@ -1,0 +1,11 @@
+mission: TESS
+pipeline: SPOC
+product_type: light_curve
+cadence_seconds: 120
+time_standard: BTJD
+flux_column: PDCSAP_FLUX
+flux_err_column: PDCSAP_FLUX_ERR
+quality_bitmask: 6575
+gap_threshold_days: 0.5
+cache_directory: data/raw/mast
+manifest_directory: data/manifests

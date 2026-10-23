@@ -1,0 +1,14 @@
+quality:
+  bitmask: 6575
+  remove_non_finite: true
+normalization:
+  segment_gap_days: 0.5
+  method: median
+  protect_transit_mask: true
+  detrending_filter: savitzky_golay
+  filter_window_cadences: 501
+  filter_poly_order: 2
+views:
+  transit_zoom_window_multiplier: 2.5
+  num_transit_bins: 200
+  num_full_orbit_bins: 500

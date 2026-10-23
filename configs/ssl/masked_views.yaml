@@ -1,0 +1,8 @@
+model_type: unsupervised_pca_prototype
+embedding_dim: 16
+random_seed: 42
+mask_fraction: 0.15
+noise_sigma: 0.0001
+pretraining_cohort: training_partition_only
+inductive_split_enforced: true
+full_self_supervised_training: future_work
