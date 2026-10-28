@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASTROVET ? Transit Candidate Vetting Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-surface: #121826;
+      --bg-surface-elevated: #1a2338;
+      --border: #263554;
+      --border-focus: #3b82f6;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-purple: #a855f7;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.5;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 20px;
+      color: #fff;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+    }
+
+    .brand-title h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-title p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .synthetic-banner {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #fca5a5;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .synthetic-tag {
+      background: #ef4444;
+      color: #fff;
+      font-weight: 700;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .layout-grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .layout-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input, select {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--border-focus);
+    }
+
+    button.btn-primary {
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      color: #fff;
+      border: none;
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    button.btn-primary:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+
+    .triage-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .badge-review { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+    .badge-candidate { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    .badge-false-positive { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-not-run { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid #475569; }
+
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    .metric-box {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--accent-blue);
+    }
+
+    .metric-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .metric-note {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    .sub-tag {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: #f59e0b;
+      margin-top: 2px;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    table.data-table th, table.data-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    table.data-table th {
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .font-mono { font-family: var(--font-mono); }
+
+    .plot-container {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      text-align: center;
+      min-height: 250px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .plot-container img {
+      max-width: 100%;
+      height: auto;
+      border-radius: var(--radius-sm);
+    }
+
+    .provenance-tag {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="brand-logo">AV</div>
+        <div class="brand-title">
+          <h1>ASTROVET</h1>
+          <p>TESS Transit Candidate Prioritization & Human Review Triage</p>
+        </div>
+      </div>
+      <div>
+        <span class="provenance-tag">ExoMiner++ Pin: v1.0.0 (commit d877a23)</span>
+      </div>
+    </header>
+
+    <div class="synthetic-banner" id="statusBanner" style="display:none;"></div>
+    <div id="errorAlert" style="display:none; background:rgba(239, 68, 68, 0.15); border:1px solid #ef4444; border-radius:var(--radius-md); padding:12px 16px; font-size:13px; color:#fca5a5;"></div>
+
+    <div class="layout-grid">
+      <!-- Controls Column -->
+      <aside class="card">
+        <div class="card-title">Real Candidate Query</div>
+        <div class="form-group">
+          <label for="candidateIdInput">Candidate Compound ID *</label>
+          <input type="text" id="candidateIdInput" value="" placeholder="e.g. 390651552-1-S23">
+          <span style="font-size:11px; color:var(--text-muted);">Format: TIC-Planet-Sector (e.g. 390651552-1-S23)</span>
+        </div>
+
+        <div class="form-group">
+          <label for="fitsPathInput">Observed FITS File Path</label>
+          <input type="text" id="fitsPathInput" value="" placeholder="Path to local FITS (or leave empty if in data/raw/mast)">
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; color:var(--accent-blue);">
+            <input type="checkbox" id="retrieveMastCheck">
+            <span>Download official SPOC light curve from MAST if not cached locally</span>
+          </label>
+        </div>
+
+        <div style="border-top:1px solid var(--border); padding-top:12px; margin-bottom:12px;">
+          <span style="font-size:12px; font-weight:600; color:var(--text-muted);">Ephemeris Constraints (Optional)</span>
+          <p style="font-size:11px; color:#64748b; margin-top:2px; margin-bottom:8px;">
+            If left blank, BLS and TLS will run an automated blind search and recover orbital parameters directly from the data.
+          </p>
+
+          <div class="form-group">
+            <label for="period">Period (Days)</label>
+            <input type="number" step="0.00001" id="period" placeholder="Leave empty for blind recovery">
+          </div>
+
+          <div class="form-group">
+            <label for="epoch">Epoch (BTJD)</label>
+            <input type="number" step="0.0001" id="epoch" placeholder="Leave empty for blind recovery">
+          </div>
+
+          <div class="form-group">
+            <label for="duration">Duration (Hours)</label>
+            <input type="number" step="0.001" id="duration" placeholder="Leave empty for blind recovery">
+          </div>
+        </div>
+
+        <button class="btn-primary" id="vetBtn" onclick="runVetting()">
+          <span>Execute Vetting & Evidence Generation</span>
+        </button>
+      </aside>
+
+      <!-- Results Column -->
+      <main class="card" id="resultsCard">
+        <div class="card-title">
+          <span>Vetting Decision & Diagnostics</span>
+          <span id="triageBadge" class="triage-badge badge-not-run">NOT RUN</span>
+        </div>
+
+        <div class="score-grid">
+          <div class="metric-box">
+            <span class="metric-label">NASA ExoMiner++ Baseline</span>
+            <span class="metric-value" id="valBaselineScore">N/A</span>
+            <span class="sub-tag" id="valBaselineMode">[NOT_RUN]</span>
+            <span class="metric-note" id="noteBaseline">Awaiting candidate vetting run</span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">ASTROVET Raw Score</span>
+            <span class="metric-value" id="valAstrovetScore">N/A</span>
+            <span class="sub-tag" id="valAstrovetMode">[NOT_RUN]</span>
+            <span class="metric-note" id="noteAstrovet">Awaiting candidate vetting run</span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Calibrated Probability</span>
+            <span class="metric-value" id="valCalibratedProb">N/A</span>
+            <span class="sub-tag" id="valCalibratedMode">[NOT_RUN]</span>
+            <span class="metric-note" id="noteCalibrated">Awaiting candidate vetting run</span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Predictive Uncertainty</span>
+            <span class="metric-value" id="valUncertainty">N/A</span>
+            <span class="sub-tag" id="valUncertaintyMode">[NOT_RUN]</span>
+            <span class="metric-note" id="noteUncertainty">Awaiting candidate vetting run</span>
+          </div>
+        </div>
+
+        <div>
+          <h3 style="font-size: 14px; margin-bottom: 8px;">Physics-Informed Diagnostics</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Diagnostic Metric</th>
+                <th>Measured Value</th>
+                <th>Availability</th>
+                <th>Status / Interpretation</th>
+              </tr>
+            </thead>
+            <tbody id="physicsTableBody">
+              <tr>
+                <td>Transit Template Depth</td>
+                <td class="font-mono">--</td>
+                <td><span style="color:var(--text-muted);">Not Run</span></td>
+                <td>Awaiting candidate vetting run</td>
+              </tr>
+              <tr>
+                <td>Transit Duration</td>
+                <td class="font-mono">--</td>
+                <td><span style="color:var(--text-muted);">Not Run</span></td>
+                <td>Awaiting candidate vetting run</td>
+              </tr>
+              <tr>
+                <td>Reduced &chi;<sup>2</sup></td>
+                <td class="font-mono">--</td>
+                <td><span style="color:var(--text-muted);">Not Run</span></td>
+                <td>Awaiting candidate vetting run</td>
+              </tr>
+              <tr>
+                <td>Odd vs. Even Consistency</td>
+                <td class="font-mono">--</td>
+                <td><span style="color:var(--text-muted);">Not Run</span></td>
+                <td>Awaiting candidate vetting run</td>
+              </tr>
+              <tr>
+                <td>Secondary Eclipse</td>
+                <td class="font-mono">--</td>
+                <td><span style="color:var(--text-muted);">Not Run</span></td>
+                <td>Awaiting candidate vetting run</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h3 style="font-size: 14px; margin-bottom: 8px;">Periodicity Search & Verification (BLS & TLS)</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Algorithm</th>
+                <th>Recovered Period</th>
+                <th>Detection Metric</th>
+                <th>Epoch (BTJD)</th>
+                <th>Duration</th>
+                <th>Odd/Even</th>
+                <th>Ephemeris Agreement</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Box Least Squares (BLS)</td>
+                <td class="font-mono" id="blsPeriod">--</td>
+                <td class="font-mono" id="blsMetric">--</td>
+                <td class="font-mono" id="blsEpoch">--</td>
+                <td class="font-mono" id="blsDuration">--</td>
+                <td>N/A</td>
+                <td id="blsAgreement">--</td>
+              </tr>
+              <tr>
+                <td>Transit Least Squares (TLS)</td>
+                <td class="font-mono" id="tlsPeriod">--</td>
+                <td class="font-mono" id="tlsMetric">--</td>
+                <td class="font-mono" id="tlsEpoch">--</td>
+                <td class="font-mono" id="tlsDuration">--</td>
+                <td class="font-mono" id="tlsOddEven">--</td>
+                <td id="tlsAgreement">--</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+            * BLS uses a standard box template; TLS uses realistic limb-darkened profiles. Detection confirms periodic recurrence, NEVER exoplanetary validation.
+          </p>
+        </div>
+
+        <div>
+          <h3 style="font-size: 14px; margin-bottom: 8px;">Diagnostic Light Curve View</h3>
+          <div class="plot-container" id="plotContainer">
+            <div id="plotPlaceholder" style="color:var(--text-muted); font-size:13px; padding:32px 16px;">
+              No diagnostic plot loaded. Enter a Candidate Compound ID and click Execute to generate diagnostic phase-folded light curve views.
+            </div>
+            <img id="diagnosticPlot" src="" alt="Transit Diagnostics" style="display:none; max-width:100%; height:auto; border-radius:var(--radius-sm);" onerror="this.style.display='none'; document.getElementById('plotPlaceholder').style.display='block'; document.getElementById('plotPlaceholder').innerText='Diagnostic plot not available for this candidate.';">
+          </div>
+        </div>
+
+        <div style="font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 12px;">
+          <strong>Attribution & Provenance Notice:</strong> ASTROVET prioritizes candidates for human review. Diagnostic attributions reflect model sensitivity patterns, not causal physical proof.
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    async function runVetting() {
+      const btn = document.getElementById('vetBtn');
+      const errBox = document.getElementById('errorAlert');
+      const statusBanner = document.getElementById('statusBanner');
+      
+      errBox.style.display = 'none';
+      errBox.textContent = '';
+      btn.innerText = 'Vetting in progress...';
+      btn.disabled = true;
+
+      const candidateId = document.getElementById('candidateIdInput').value.trim();
+      if (!candidateId) {
+        errBox.textContent = 'Validation Error: Candidate Compound ID is required (e.g. 390651552-1-S23).';
+        errBox.style.display = 'block';
+        btn.innerText = 'Execute Vetting & Evidence Generation';
+        btn.disabled = false;
+        return;
+      }
+
+      const fitsFile = document.getElementById('fitsPathInput').value.trim();
+      const retrieveMast = document.getElementById('retrieveMastCheck').checked;
+      const period = document.getElementById('period').value.trim();
+      const epoch = document.getElementById('epoch').value.trim();
+      const duration = document.getElementById('duration').value.trim();
+
+      const params = new URLSearchParams();
+      params.append('candidate_id', candidateId);
+      if (fitsFile) params.append('fits_file', fitsFile);
+      if (retrieveMast) params.append('retrieve_mast', 'true');
+      if (period) params.append('period', period);
+      if (epoch) params.append('epoch', epoch);
+      if (duration) params.append('duration', duration);
+
+      try {
+        const resp = await fetch(`/api/vet?${params.toString()}`);
+        const data = await resp.json().catch(() => null);
+
+        if (!resp.ok) {
+          const msg = data && data.error ? data.error : `HTTP ${resp.status} ${resp.statusText}`;
+          errBox.textContent = `Vetting Pipeline Error: ${msg}`;
+          errBox.style.display = 'block';
+          return;
+        }
+
+        // Render status banner
+        if (data.is_synthetic) {
+          statusBanner.className = 'synthetic-banner';
+          statusBanner.removeAttribute('style');
+          statusBanner.textContent = 'DEMO / SYNTHETIC FIXTURE — Evaluated using synthetic test data. Not a real flight prediction.';
+          statusBanner.style.display = 'flex';
+        } else {
+          statusBanner.className = 'synthetic-banner';
+          statusBanner.style.background = 'rgba(16, 185, 129, 0.12)';
+          statusBanner.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+          statusBanner.style.color = '#a7f3d0';
+          statusBanner.textContent = `REAL OBSERVED DATA — Evaluated from official TESS SPOC observation (${data.fits_file_used || 'data/raw/mast'}).`;
+          statusBanner.style.display = 'flex';
+        }
+
+        document.getElementById('valBaselineScore').innerText = data.baseline_score !== null ? data.baseline_score.toFixed(4) : 'N/A';
+        document.getElementById('valBaselineMode').innerText = `[${data.baseline_execution_mode || 'BASELINE_UNAVAILABLE'}]`;
+        document.getElementById('noteBaseline').innerText = data.baseline_score !== null ? 'ExoMiner baseline model score' : 'Baseline unavailable in catalog / container daemon absent';
+
+        document.getElementById('valAstrovetScore').innerText = data.astrovet_raw_score !== null ? data.astrovet_raw_score.toFixed(4) : 'N/A';
+        document.getElementById('valAstrovetMode').innerText = `[${data.score_type ? data.score_type.toUpperCase() : 'HEURISTIC'}]`;
+        document.getElementById('noteAstrovet').innerText = data.score_type === 'fitted_fusion_score' ? 'Fitted fusion ranking score (not a probability)' : 'Heuristic triage score (uncalibrated)';
+
+        document.getElementById('valCalibratedProb').innerText = data.calibrated_planet_like_probability !== null ? data.calibrated_planet_like_probability.toFixed(4) : 'N/A';
+        document.getElementById('valCalibratedMode').innerText = data.is_calibrated ? '[CALIBRATED]' : '[NOT_CALIBRATED]';
+        document.getElementById('noteCalibrated').innerText = data.is_calibrated ? 'Fitted Platt calibrator probability' : 'No fitted calibrator supplied';
+
+        document.getElementById('valUncertainty').innerText = data.predictive_uncertainty !== null ? `±${data.predictive_uncertainty.toFixed(3)}` : 'N/A';
+        document.getElementById('valUncertaintyMode').innerText = (data.predictive_uncertainty !== null && data.predictive_uncertainty < 0.3) ? '[LOW_UNCERTAINTY]' : '[HIGH_UNCERTAINTY]';
+        document.getElementById('noteUncertainty').innerText = (data.predictive_uncertainty !== null && data.predictive_uncertainty < 0.3) ? 'Within confidence margin' : 'Human review required for final triage';
+
+        const badge = document.getElementById('triageBadge');
+        badge.innerText = data.class_or_triage_state.replace('_', ' ');
+        if (data.class_or_triage_state === 'PLANET_LIKE') {
+          badge.className = 'triage-badge badge-candidate';
+        } else if (data.class_or_triage_state === 'FALSE_POSITIVE_LIKE') {
+          badge.className = 'triage-badge badge-false-positive';
+        } else {
+          badge.className = 'triage-badge badge-review';
+        }
+
+        // Render physics table
+        const diag = data.diagnostics || {};
+        const pBody = document.getElementById('physicsTableBody');
+        pBody.innerHTML = `
+          <tr>
+            <td>Transit Template Depth</td>
+            <td class="font-mono">${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? diag.transit_depth_fitted_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
+            <td><span style="color:${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? '#10b981' : '#94a3b8'};">${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? 'Available' : 'N/A'}</span></td>
+            <td>Limb-darkened template fit</td>
+          </tr>
+          <tr>
+            <td>Transit Duration</td>
+            <td class="font-mono">${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? diag.transit_duration_fitted_hours.toFixed(3) + ' hours' : 'N/A'}</td>
+            <td><span style="color:${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? '#10b981' : '#94a3b8'};">${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? 'Available' : 'N/A'}</span></td>
+            <td>Contact I-IV estimate</td>
+          </tr>
+          <tr>
+            <td>Reduced &chi;<sup>2</sup></td>
+            <td class="font-mono">${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? diag.fit_chi2_reduced.toFixed(3) : 'N/A'}</td>
+            <td><span style="color:${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? '#10b981' : '#94a3b8'};">${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? 'Available' : 'N/A'}</span></td>
+            <td>Residual template goodness-of-fit</td>
+          </tr>
+          <tr>
+            <td>Odd vs. Even Consistency</td>
+            <td class="font-mono">${diag.odd_even_depth_diff_ppm !== null && diag.odd_even_depth_diff_ppm !== undefined ? '&Delta; = ' + diag.odd_even_depth_diff_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
+            <td><span style="color:${diag.odd_even_consistent ? '#10b981' : (diag.odd_even_consistent === false ? '#ef4444' : '#94a3b8')};">${diag.odd_even_consistent === true ? 'Consistent' : (diag.odd_even_consistent === false ? 'Discrepant' : 'N/A')}</span></td>
+            <td>Odd/even consistency screen; not an exclusion test</td>
+          </tr>
+          <tr>
+            <td>Secondary Eclipse</td>
+            <td class="font-mono">${diag.secondary_depth_ppm !== null && diag.secondary_depth_ppm !== undefined ? 'Depth = ' + diag.secondary_depth_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
+            <td><span style="color:${diag.secondary_eclipse_detected ? '#ef4444' : (diag.secondary_eclipse_detected === false ? '#10b981' : '#94a3b8')};">${diag.secondary_eclipse_detected ? 'Detected (EB risk)' : (diag.secondary_eclipse_detected === false ? 'Not detected' : 'N/A')}</span></td>
+            <td>Phase 0.5 occultation search</td>
+          </tr>
+        `;
+
+        if (data.plot_url) {
+          const plotImg = document.getElementById('diagnosticPlot');
+          const plotPlaceholder = document.getElementById('plotPlaceholder');
+          plotImg.src = `${data.plot_url}?t=${new Date().getTime()}`;
+          plotImg.style.display = 'block';
+          plotPlaceholder.style.display = 'none';
+        }
+
+        if (data.periodogram) {
+          const bls = data.periodogram.bls || {};
+          const tls = data.periodogram.tls || {};
+
+          if (bls.is_available) {
+            document.getElementById('blsPeriod').innerText = `${bls.best_period_days.toFixed(4)} d`;
+            document.getElementById('blsMetric').innerText = `SNR = ${bls.peak_snr}`;
+            document.getElementById('blsEpoch').innerText = bls.best_t0_btjd ? bls.best_t0_btjd.toFixed(4) : '--';
+            document.getElementById('blsDuration').innerText = bls.best_duration_hours ? `${bls.best_duration_hours.toFixed(2)} h` : '--';
+            document.getElementById('blsAgreement').innerText = bls.compared_to_ephemeris ? (bls.is_period_match ? `Match (${bls.period_diff_percent}%)` : (bls.is_harmonic ? `Harmonic (${bls.harmonic_relation})` : `Diff: ${bls.period_diff_percent || 'N/A'}%`)) : 'Recovered (Blind Search)';
+          } else {
+            document.getElementById('blsPeriod').innerText = 'Unavailable';
+            document.getElementById('blsMetric').innerText = bls.reason || 'Not executed';
+            document.getElementById('blsEpoch').innerText = '--';
+            document.getElementById('blsDuration').innerText = '--';
+            document.getElementById('blsAgreement').innerText = '--';
+          }
+
+          if (tls.is_available) {
+            document.getElementById('tlsPeriod').innerText = `${tls.best_period_days.toFixed(4)} d`;
+            document.getElementById('tlsMetric').innerText = `SDE = ${tls.sde}`;
+            document.getElementById('tlsEpoch').innerText = tls.best_t0_btjd ? tls.best_t0_btjd.toFixed(4) : '--';
+            document.getElementById('tlsDuration').innerText = tls.best_duration_hours ? `${tls.best_duration_hours.toFixed(2)} h` : '--';
+            document.getElementById('tlsOddEven').innerText = tls.odd_even_mismatch !== null ? tls.odd_even_mismatch.toFixed(2) : '--';
+            document.getElementById('tlsAgreement').innerText = tls.compared_to_ephemeris ? (tls.is_period_match ? `Match (${tls.period_diff_percent}%)` : (tls.is_harmonic ? `Harmonic (${tls.harmonic_relation})` : `Diff: ${tls.period_diff_percent || 'N/A'}%`)) : 'Recovered (Blind Search)';
+          } else {
+            document.getElementById('tlsPeriod').innerText = 'Unavailable';
+            document.getElementById('tlsMetric').innerText = tls.reason || 'Not executed';
+            document.getElementById('tlsEpoch').innerText = '--';
+            document.getElementById('tlsDuration').innerText = '--';
+            document.getElementById('tlsOddEven').innerText = '--';
+            document.getElementById('tlsAgreement').innerText = '--';
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        errBox.textContent = `Network Error: ${err.message}`;
+        errBox.style.display = 'block';
+      } finally {
+        btn.innerText = 'Execute Vetting & Evidence Generation';
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
