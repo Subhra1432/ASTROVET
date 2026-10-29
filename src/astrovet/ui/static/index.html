@@ -103,9 +103,22 @@
       gap: 24px;
     }
 
+    .intro-note, .helper-text, .summary-note { color: var(--text-muted); font-size: 13px; }
+    .intro-note { max-width: 760px; }
+    .step-list { padding-left: 20px; color: var(--text-muted); font-size: 13px; }
+    .step-list li + li { margin-top: 4px; }
+    .simple-summary { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; background: var(--bg-surface-elevated); }
+    .simple-summary h3 { font-size: 16px; margin-bottom: 6px; }
+    details.advanced { border-top: 1px solid var(--border); padding-top: 12px; }
+    details.advanced > summary, .technical-details > summary { cursor: pointer; color: var(--accent-blue); font-size: 13px; font-weight: 600; }
+    details.advanced[open] > summary { margin-bottom: 12px; }
+    .technical-details { margin-top: 14px; }
+    .technical-details > summary { margin-bottom: 10px; }
+
     @media (max-width: 900px) {
       .layout-grid { grid-template-columns: 1fr; }
     }
+    @media (max-width: 600px) { body { padding: 14px; } header { align-items: flex-start; } .brand-title h1 { font-size: 19px; } }
 
     .card {
       background: var(--bg-surface);
@@ -326,11 +339,11 @@
         <div class="brand-logo">AV</div>
         <div class="brand-title">
           <h1>ASTROVET</h1>
-          <p>TESS Transit Candidate Prioritization & Human Review Triage</p>
+          <p>Review possible planets in TESS data</p>
         </div>
       </div>
       <div>
-        <span class="provenance-tag">ExoMiner++ Pin: v1.0.0 (commit d877a23)</span>
+        <span class="provenance-tag">Research tool · results need human review</span>
       </div>
     </header>
 
@@ -341,12 +354,14 @@
       <!-- Controls Column -->
       <aside class="card">
         <div class="card-title">
-          <span>Input & Light Curve Selection</span>
+          <span>Start a review</span>
         </div>
+        <p class="intro-note">Upload a TESS light-curve FITS file. ASTROVET will check the data, look for repeating dips, and prepare a review summary.</p>
+        <ol class="step-list"><li>Choose a FITS file from TESS.</li><li>Select <strong>Analyze light curve</strong>.</li><li>Read the result and review the plots.</li></ol>
 
         <!-- 1. Safe Upload Section -->
         <div class="form-group">
-          <label>Upload TESS Light Curve (.fits / .fits.gz)</label>
+          <label for="fitsFileInput">TESS light-curve file</label>
           <div class="upload-zone" id="dropZone" onclick="document.getElementById('fitsFileInput').click()">
             <input type="file" id="fitsFileInput" accept=".fits,.fits.gz" style="display:none" onchange="handleFileSelected(this.files)">
             <div id="uploadPrompt">
@@ -355,8 +370,8 @@
                 <polyline points="17 8 12 3 7 8"></polyline>
                 <line x1="12" y1="3" x2="12" y2="15"></line>
               </svg>
-              <div style="font-size:13px; font-weight:600; color:var(--text-main);">Click or Drag & Drop FITS File</div>
-              <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Supports TESS SPOC and QLP formats (Max 50MB)</div>
+              <div style="font-size:14px; font-weight:600; color:var(--text-main);">Choose a file or drag it here</div>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">TESS FITS files from SPOC or QLP · up to 50 MB</div>
             </div>
             <div id="uploadSelected" style="display:none; font-family:var(--font-mono); font-size:12px; color:var(--accent-blue); word-break:break-all;"></div>
           </div>
@@ -364,59 +379,62 @@
 
         <!-- 2. Candidate ID & Server Path Option -->
         <div class="form-group">
-          <label for="candidateIdInput">Candidate Compound ID (Optional if uploading FITS)</label>
-          <input type="text" id="candidateIdInput" value="" placeholder="e.g. 390651552-1-S23 (auto-derived if uploaded)">
-          <span style="font-size:11px; color:var(--text-muted);">Format: TIC-Planet-Sector</span>
+          <label for="candidateIdInput">Candidate ID (optional)</label>
+          <input type="text" id="candidateIdInput" value="" placeholder="Filled in automatically when possible">
+          <span class="helper-text">Leave blank when uploading a file; ASTROVET will try to read it from the file.</span>
         </div>
 
-        <div class="form-group">
-          <label for="fitsPathInput">Or Local Cached FITS Path</label>
-          <input type="text" id="fitsPathInput" value="" placeholder="Path in data/raw/mast (or use upload above)">
-        </div>
-
-        <div class="form-group" style="margin-bottom:8px;">
-          <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; color:var(--accent-blue);">
-            <input type="checkbox" id="retrieveMastCheck">
-            <span>Download official SPOC light curve from MAST if not cached</span>
-          </label>
-        </div>
-
-        <!-- 3. Ephemeris Overrides -->
-        <div style="border-top:1px solid var(--border); padding-top:12px; margin-bottom:12px;">
-          <span style="font-size:12px; font-weight:600; color:var(--text-muted);">Ephemeris Constraints (Optional)</span>
-          <p style="font-size:11px; color:#64748b; margin-top:2px; margin-bottom:8px;">
-            If blank, BLS and TLS automatically recover orbital parameters directly from the data.
-          </p>
-
-          <div class="form-group">
-            <label for="period">Period (Days)</label>
-            <input type="number" step="0.00001" id="period" placeholder="Leave empty for blind recovery">
+        <details class="advanced">
+          <summary>Advanced options</summary>
+          <p class="helper-text">Most people can leave these settings unchanged.</p>
+          <div class="form-group" style="margin-top:10px;">
+            <label for="fitsPathInput">Use a FITS file already on this computer</label>
+            <input type="text" id="fitsPathInput" value="" placeholder="Local file path">
           </div>
-
-          <div class="form-group">
-            <label for="epoch">Epoch (BTJD)</label>
-            <input type="number" step="0.0001" id="epoch" placeholder="Leave empty for blind recovery">
+          <div class="form-group" style="margin-top:10px;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; color:var(--accent-blue);">
+              <input type="checkbox" id="retrieveMastCheck">
+              <span>Download the SPOC file from NASA MAST if it is not already available</span>
+            </label>
           </div>
-
-          <div class="form-group">
-            <label for="duration">Duration (Hours)</label>
-            <input type="number" step="0.001" id="duration" placeholder="Leave empty for blind recovery">
-            <label for="depth">Transit Depth (ppm, optional)</label>
-            <input type="number" step="any" id="depth" placeholder="For example, 1200">
+          <div style="border-top:1px solid var(--border); padding-top:12px; margin-top:12px;">
+            <span style="font-size:13px; font-weight:600;">Known transit measurements</span>
+            <p class="helper-text" style="margin:4px 0 10px;">Enter these only if you already have them. Otherwise ASTROVET searches the light curve.</p>
+            <div class="form-group">
+              <label for="period">Time between transits (days)</label>
+              <input type="number" step="0.00001" id="period" placeholder="Optional">
+            </div>
+            <div class="form-group">
+              <label for="epoch">Time of a transit (BTJD)</label>
+              <input type="number" step="0.0001" id="epoch" placeholder="Optional">
+            </div>
+            <div class="form-group">
+              <label for="duration">Transit length (hours)</label>
+              <input type="number" step="0.001" id="duration" placeholder="Optional">
+              <label for="depth">Transit depth (ppm)</label>
+              <input type="number" step="any" id="depth" placeholder="For example, 1200">
+            </div>
           </div>
-        </div>
+        </details>
 
         <button class="btn-primary" id="vetBtn" onclick="runPipelineAction()">
-          <span>Execute Vetting & Evidence Generation</span>
+          <span>Analyze light curve</span>
         </button>
       </aside>
 
       <!-- Results Column -->
       <main class="card" id="resultsCard">
         <div class="card-title">
-          <span>Vetting Decision & Diagnostics</span>
-          <span id="triageBadge" class="triage-badge badge-not-run">NOT RUN</span>
+          <span>Review result</span>
+          <span id="triageBadge" class="triage-badge badge-not-run">Not started</span>
         </div>
+        <div class="simple-summary" aria-live="polite">
+          <h3 id="summaryHeading">Your result will appear here</h3>
+          <p id="triageExplanation" class="summary-note">Upload a TESS light curve and choose Analyze light curve to begin. ASTROVET helps prioritize candidates; it cannot confirm a planet.</p>
+        </div>
+
+        <details class="technical-details">
+          <summary>Show scores and technical details</summary>
 
         <!-- Upload Audit Banner (Shown when a file is uploaded) -->
         <div id="uploadAuditPanel" class="audit-card" style="display:none;">
@@ -440,28 +458,28 @@
 
         <div class="score-grid">
           <div class="metric-box">
-            <span class="metric-label">NASA ExoMiner++ Baseline</span>
+            <span class="metric-label">ExoMiner comparison score</span>
             <span class="metric-value" id="valBaselineScore">N/A</span>
             <span class="sub-tag" id="valBaselineMode">[NOT_RUN]</span>
-            <span class="metric-note" id="noteBaseline">Awaiting candidate vetting run</span>
+            <span class="metric-note" id="noteBaseline">A comparison from the NASA baseline model, when available.</span>
           </div>
 
           <div class="metric-box">
-            <span class="metric-label">ASTROVET Raw Score</span>
+            <span class="metric-label">ASTROVET ranking score</span>
             <span class="metric-value" id="valAstrovetScore">N/A</span>
             <span class="sub-tag" id="valAstrovetMode">[NOT_RUN]</span>
-            <span class="metric-note" id="noteAstrovet">Awaiting candidate vetting run</span>
+            <span class="metric-note" id="noteAstrovet">Helps sort candidates for review; it is not a probability.</span>
           </div>
 
           <div class="metric-box">
-            <span class="metric-label">Calibrated Score</span>
+            <span class="metric-label">Estimated planet-like score</span>
             <span class="metric-value" id="valCalibratedProb">N/A</span>
             <span class="sub-tag" id="valCalibratedMode">[NOT_RUN]</span>
-            <span class="metric-note" id="noteCalibrated">Awaiting candidate vetting run</span>
+            <span class="metric-note" id="noteCalibrated">May not reflect the chance for a randomly chosen star.</span>
           </div>
 
           <div class="metric-box">
-            <span class="metric-label">Predictive Uncertainty</span>
+            <span class="metric-label">Model uncertainty</span>
             <span class="metric-value" id="valUncertainty">N/A</span>
             <span class="sub-tag" id="valUncertaintyMode">[NOT_RUN]</span>
             <span class="metric-note" id="noteUncertainty">Awaiting candidate vetting run</span>
@@ -571,9 +589,9 @@
           </div>
         </div>
 
-        <div style="font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 12px;">
-          <strong>Scientific Notice:</strong> ASTROVET is a triage aid for human review. High scores reflect candidate plausibility, NOT physical planet validation. The tabular catalog baseline artifact models periodic transit signals (E) vs contact binaries (B) or noise (J); it does not validate planets.
-        </div>
+        </details>
+
+        <p class="summary-note"><strong>Please remember:</strong> A repeating dip can have causes other than a planet. ASTROVET helps prioritize candidates for human review; it does not confirm planets.</p>
       </main>
     </div>
   </div>
@@ -625,7 +643,7 @@
       const btn = document.getElementById('vetBtn');
       const errBox = document.getElementById('errorAlert');
       errBox.style.display = 'none';
-      btn.innerText = 'Uploading & Vetting...';
+      btn.innerText = 'Checking the light curve…';
       btn.disabled = true;
 
       const formData = new FormData();
@@ -652,17 +670,17 @@
 
         if (!resp.ok) {
           const msg = data && data.error ? data.error : `HTTP ${resp.status} ${resp.statusText}`;
-          errBox.textContent = `Upload / Vetting Error: ${msg}`;
+          errBox.textContent = `We could not analyze this file: ${msg}`;
           errBox.style.display = 'block';
           return;
         }
 
         renderVettingResults(data);
       } catch (err) {
-        errBox.textContent = `Network Error during upload: ${err.message}`;
+        errBox.textContent = `The upload did not finish. Check your connection and try again. (${err.message})`;
         errBox.style.display = 'block';
       } finally {
-        btn.innerText = 'Execute Vetting & Evidence Generation';
+        btn.innerText = 'Analyze light curve';
         btn.disabled = false;
       }
     }
@@ -674,12 +692,12 @@
 
       const candidateId = document.getElementById('candidateIdInput').value.trim();
       if (!candidateId) {
-        errBox.textContent = 'Validation Error: Please select a FITS file to upload, or enter a Candidate Compound ID.';
+        errBox.textContent = 'Choose a TESS FITS file or enter a candidate ID in Advanced options.';
         errBox.style.display = 'block';
         return;
       }
 
-      btn.innerText = 'Vetting in progress...';
+      btn.innerText = 'Checking the light curve…';
       btn.disabled = true;
 
       const fitsFile = document.getElementById('fitsPathInput').value.trim();
@@ -704,17 +722,17 @@
 
         if (!resp.ok) {
           const msg = data && data.error ? data.error : `HTTP ${resp.status} ${resp.statusText}`;
-          errBox.textContent = `Vetting Pipeline Error: ${msg}`;
+          errBox.textContent = `We could not analyze this candidate: ${msg}`;
           errBox.style.display = 'block';
           return;
         }
 
         renderVettingResults(data);
       } catch (err) {
-        errBox.textContent = `Network Error: ${err.message}`;
+        errBox.textContent = `The request did not finish. Check your connection and try again. (${err.message})`;
         errBox.style.display = 'block';
       } finally {
-        btn.innerText = 'Execute Vetting & Evidence Generation';
+        btn.innerText = 'Analyze light curve';
         btn.disabled = false;
       }
     }
@@ -791,12 +809,23 @@
       document.getElementById('scoreExplanation').innerText = explanationLines.join('\n');
 
       const badge = document.getElementById('triageBadge');
-      badge.innerText = data.class_or_triage_state.replace(/_/g, ' ');
-      if (data.class_or_triage_state === 'PLANET_LIKE') {
+      const decision = data.class_or_triage_state;
+      const summaryHeading = document.getElementById('summaryHeading');
+      const triageExplanation = document.getElementById('triageExplanation');
+      if (decision === 'PLANET_LIKE') {
+        badge.innerText = 'Worth a closer look';
+        summaryHeading.innerText = 'A transit-like signal was found';
+        triageExplanation.innerText = 'The measurements look promising enough for follow-up. This result does not confirm that the signal is a planet; a person should review the evidence.';
         badge.className = 'triage-badge badge-candidate';
-      } else if (data.class_or_triage_state === 'FALSE_POSITIVE_LIKE') {
+      } else if (decision === 'FALSE_POSITIVE_LIKE') {
+        badge.innerText = 'Possible false alarm';
+        summaryHeading.innerText = 'The signal may have another explanation';
+        triageExplanation.innerText = 'The checks found patterns that can be caused by binary stars or noise. This is an automated assessment, not a final decision.';
         badge.className = 'triage-badge badge-false-positive';
       } else {
+        badge.innerText = 'Needs human review';
+        summaryHeading.innerText = 'The automated checks are uncertain';
+        triageExplanation.innerText = 'The checks may disagree, the data may be incomplete, or the model may be uncertain. Review the measurements and light-curve plot before drawing a conclusion.';
         badge.className = 'triage-badge badge-review';
       }
 

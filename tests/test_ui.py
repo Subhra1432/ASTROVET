@@ -53,8 +53,8 @@ class TestDashboardUI(unittest.TestCase):
             self.assertIn('id="retrieveMastCheck"', content)
             self.assertIn('id="depth"', content)
 
-            # Ensure pre-run display shows neutral NOT RUN and N/A placeholders
-            self.assertIn('id="triageBadge" class="triage-badge badge-not-run">NOT RUN</span>', content)
+            # Ensure pre-run display shows a plain-language neutral state and N/A placeholders
+            self.assertIn('id="triageBadge" class="triage-badge badge-not-run">Not started</span>', content)
             self.assertIn('id="valBaselineScore">N/A</span>', content)
             self.assertIn('id="valBaselineMode">[NOT_RUN]</span>', content)
             self.assertIn('id="valAstrovetScore">N/A</span>', content)
