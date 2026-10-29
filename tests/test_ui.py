@@ -56,7 +56,7 @@ class TestDashboardUI(unittest.TestCase):
             # Ensure pre-run display shows a plain-language neutral state and N/A placeholders
             self.assertIn('id="triageBadge" class="triage-badge badge-not-run">Not started</span>', content)
             self.assertIn('id="valBaselineScore">N/A</span>', content)
-            self.assertIn('id="valBaselineMode">[NOT_RUN]</span>', content)
+            self.assertIn('id="valBaselineMode">Not checked yet</span>', content)
             self.assertIn('id="valAstrovetScore">N/A</span>', content)
             self.assertIn('id="valCalibratedProb">N/A</span>', content)
             self.assertIn('id="valUncertainty">N/A</span>', content)

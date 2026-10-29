@@ -431,26 +431,27 @@
         <div class="simple-summary" aria-live="polite">
           <h3 id="summaryHeading">Your result will appear here</h3>
           <p id="triageExplanation" class="summary-note">Upload a TESS light curve and choose Analyze light curve to begin. ASTROVET helps prioritize candidates; it cannot confirm a planet.</p>
+          <a id="fullReportLink" href="#" style="display:none; color:var(--accent-blue); font-size:13px; margin-top:10px;">Open the detailed report</a>
         </div>
 
         <details class="technical-details">
-          <summary>Show scores and technical details</summary>
+          <summary>Show measurements and model scores</summary>
 
         <!-- Upload Audit Banner (Shown when a file is uploaded) -->
         <div id="uploadAuditPanel" class="audit-card" style="display:none;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <div style="font-weight:700; font-size:13px; color:#fff; display:flex; align-items:center; gap:8px;">
-              <span>FITS Ingestion & Preprocessing Audit</span>
-              <span id="auditPipelinePill" class="pill pill-spoc">SPOC</span>
+              <span>File and data quality check</span>
+              <span id="auditPipelinePill" class="pill pill-spoc">TESS</span>
             </div>
             <span id="auditFileSize" class="font-mono" style="color:var(--text-muted);">--</span>
           </div>
 
           <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:8px; margin-bottom:8px;">
-            <div><strong>SHA-256:</strong> <span id="auditSha256" class="font-mono" style="word-break:break-all; font-size:11px;">--</span></div>
-            <div><strong>Target / Sector:</strong> <span id="auditTargetSector">--</span></div>
-            <div><strong>Cadence Retention:</strong> <span id="auditCadenceRetention">--</span></div>
-            <div><strong>Segments:</strong> <span id="auditSegmentsCount">--</span></div>
+            <div><strong>File fingerprint:</strong> <span id="auditSha256" class="font-mono" style="word-break:break-all; font-size:11px;">--</span><br><span class="helper-text">Identifies the exact file analyzed.</span></div>
+            <div><strong>TESS star and sector:</strong> <span id="auditTargetSector">--</span></div>
+            <div><strong>Usable brightness readings:</strong> <span id="auditCadenceRetention">--</span></div>
+            <div><strong>Observing stretches:</strong> <span id="auditSegmentsCount">--</span></div>
           </div>
 
           <div id="auditWarnings" style="color:#fca5a5; margin-top:4px; font-size:11px;"></div>
@@ -460,102 +461,104 @@
           <div class="metric-box">
             <span class="metric-label">ExoMiner comparison score</span>
             <span class="metric-value" id="valBaselineScore">N/A</span>
-            <span class="sub-tag" id="valBaselineMode">[NOT_RUN]</span>
-            <span class="metric-note" id="noteBaseline">A comparison from the NASA baseline model, when available.</span>
+            <span class="sub-tag" id="valBaselineMode">Not checked yet</span>
+            <span class="metric-note" id="noteBaseline">Higher scores mean the NASA model found a more planet-like pattern. This is one model’s score, not proof.</span>
           </div>
 
           <div class="metric-box">
-            <span class="metric-label">ASTROVET ranking score</span>
+            <span class="metric-label">ASTROVET research score</span>
             <span class="metric-value" id="valAstrovetScore">N/A</span>
-            <span class="sub-tag" id="valAstrovetMode">[NOT_RUN]</span>
-            <span class="metric-note" id="noteAstrovet">Helps sort candidates for review; it is not a probability.</span>
+            <span class="sub-tag" id="valAstrovetMode">Not checked yet</span>
+            <span class="metric-note" id="noteAstrovet">Shown on a 0–100 model scale. Higher scores rank as more planet-like for review; not a probability.</span>
           </div>
 
           <div class="metric-box">
-            <span class="metric-label">Estimated planet-like score</span>
+            <span class="metric-label">Comparison with a follow-up sample</span>
             <span class="metric-value" id="valCalibratedProb">N/A</span>
-            <span class="sub-tag" id="valCalibratedMode">[NOT_RUN]</span>
-            <span class="metric-note" id="noteCalibrated">May not reflect the chance for a randomly chosen star.</span>
+            <span class="sub-tag" id="valCalibratedMode">Not checked yet</span>
+            <span class="metric-note" id="noteCalibrated">Not the chance that this object is a planet.</span>
           </div>
 
           <div class="metric-box">
-            <span class="metric-label">Model uncertainty</span>
+            <span class="metric-label">How much the model is unsure</span>
             <span class="metric-value" id="valUncertainty">N/A</span>
-            <span class="sub-tag" id="valUncertaintyMode">[NOT_RUN]</span>
+            <span class="sub-tag" id="valUncertaintyMode">Not checked yet</span>
             <span class="metric-note" id="noteUncertainty">Awaiting candidate vetting run</span>
           </div>
         </div>
 
         <div class="audit-card" style="margin: 10px 0;">
-          <div style="font-size:12px; font-weight:700; margin-bottom:5px;">Model Inputs & Score Explanation</div>
-          <div style="font-size:12px; color:var(--text-muted);">SSL representation: <strong id="sslStatus">Not run</strong>. This encoder learns light-curve representations; it is not, by itself, a planet classifier.</div>
-          <pre id="scoreExplanation" style="white-space:pre-wrap; font-family:inherit; font-size:12px; line-height:1.5; color:var(--text-main); margin:6px 0 0;">Explanation appears after a real-data vetting run.</pre>
-          <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Model explanations describe score mechanics/associations, not causal proof.</div>
+          <div style="font-size:12px; font-weight:700; margin-bottom:5px;">Why the model gave this result</div>
+          <div style="font-size:12px; color:var(--text-muted);">Pattern-learning component: <strong id="sslStatus">Not run</strong>. It helps describe the brightness pattern but does not decide whether something is a planet.</div>
+          <pre id="scoreExplanation" style="white-space:pre-wrap; font-family:inherit; font-size:12px; line-height:1.5; color:var(--text-main); margin:6px 0 0;">A plain-language explanation will appear after analysis.</pre>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">These clues show what influenced the model; they do not prove what caused the signal.</div>
         </div>
 
         <div>
-          <h3 style="font-size: 14px; margin-bottom: 8px;">Physics-Informed Diagnostics</h3>
+          <h3 style="font-size: 14px; margin-bottom: 8px;">Checks of the brightness dips</h3>
+          <p class="helper-text" style="margin-bottom:8px;">These measurements describe how the dips look. None can confirm a planet by itself.</p>
           <table class="data-table">
             <thead>
               <tr>
-                <th>Diagnostic Metric</th>
-                <th>Measured Value</th>
-                <th>Availability</th>
-                <th>Status / Interpretation</th>
+                <th>What we checked</th>
+                <th>Measurement</th>
+                <th>Result</th>
+                <th>What it can tell us</th>
               </tr>
             </thead>
             <tbody id="physicsTableBody">
               <tr>
-                <td>Transit Template Depth</td>
+                <td>How deep is the dip?</td>
                 <td class="font-mono">--</td>
-                <td><span style="color:var(--text-muted);">Not Run</span></td>
-                <td>Awaiting candidate vetting run</td>
+                <td><span style="color:var(--text-muted);">Not measured</span></td>
+                <td>Will be checked after analysis.</td>
               </tr>
               <tr>
-                <td>Transit Duration</td>
+                <td>How long does the dip last?</td>
                 <td class="font-mono">--</td>
-                <td><span style="color:var(--text-muted);">Not Run</span></td>
-                <td>Awaiting candidate vetting run</td>
+                <td><span style="color:var(--text-muted);">Not measured</span></td>
+                <td>Will be checked after analysis.</td>
               </tr>
               <tr>
-                <td>Reduced &chi;<sup>2</sup></td>
+                <td>How well does the shape fit?</td>
                 <td class="font-mono">--</td>
-                <td><span style="color:var(--text-muted);">Not Run</span></td>
-                <td>Awaiting candidate vetting run</td>
+                <td><span style="color:var(--text-muted);">Not measured</span></td>
+                <td>Will be checked after analysis.</td>
               </tr>
               <tr>
-                <td>Odd vs. Even Consistency</td>
+                <td>Are alternating dips alike?</td>
                 <td class="font-mono">--</td>
-                <td><span style="color:var(--text-muted);">Not Run</span></td>
-                <td>Awaiting candidate vetting run</td>
+                <td><span style="color:var(--text-muted);">Not measured</span></td>
+                <td>Will be checked after analysis.</td>
               </tr>
               <tr>
-                <td>Secondary Eclipse</td>
+                <td>Is there another dip between transits?</td>
                 <td class="font-mono">--</td>
-                <td><span style="color:var(--text-muted);">Not Run</span></td>
-                <td>Awaiting candidate vetting run</td>
+                <td><span style="color:var(--text-muted);">Not measured</span></td>
+                <td>Will be checked after analysis.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <div>
-          <h3 style="font-size: 14px; margin-bottom: 8px;">Periodicity Search & Verification (BLS & TLS)</h3>
+          <h3 style="font-size: 14px; margin-bottom: 8px;">Do the dips repeat regularly?</h3>
+          <p class="helper-text" style="margin-bottom:8px;">Two search methods look for repeating dips. Agreement supports a repeating signal, but not its cause.</p>
           <table class="data-table">
             <thead>
               <tr>
-                <th>Algorithm</th>
-                <th>Recovered Period</th>
-                <th>Detection Metric</th>
-                <th>Epoch (BTJD)</th>
-                <th>Duration</th>
-                <th>Odd/Even</th>
-                <th>Ephemeris Agreement</th>
+                <th>Search</th>
+                <th>Time between dips</th>
+                <th>Signal strength</th>
+                <th title="Time shown in the TESS Barycentric Julian Date system">Approx. transit time</th>
+                <th>Dip length</th>
+                <th>Alternating dips</th>
+                <th>Match to supplied details</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>Box Least Squares (BLS)</td>
+                <td>Search 1<br><span class="helper-text">box-shaped dips (BLS)</span></td>
                 <td class="font-mono" id="blsPeriod">--</td>
                 <td class="font-mono" id="blsMetric">--</td>
                 <td class="font-mono" id="blsEpoch">--</td>
@@ -564,7 +567,7 @@
                 <td id="blsAgreement">--</td>
               </tr>
               <tr>
-                <td>Transit Least Squares (TLS)</td>
+                <td>Search 2<br><span class="helper-text">planet-shaped dips (TLS)</span></td>
                 <td class="font-mono" id="tlsPeriod">--</td>
                 <td class="font-mono" id="tlsMetric">--</td>
                 <td class="font-mono" id="tlsEpoch">--</td>
@@ -575,15 +578,16 @@
             </tbody>
           </table>
           <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-            * BLS uses a box profile; TLS uses limb-darkened profiles. Detection confirms signal periodicity, NEVER planet confirmation.
+            “Signal strength” (SNR and SDE) describes how noticeable the repeating pattern is; higher usually means clearer. A strong pattern is not proof of a planet. Transit time uses TESS’s time standard (BTJD).
           </p>
         </div>
 
         <div>
-          <h3 style="font-size: 14px; margin-bottom: 8px;">Diagnostic Light Curve View</h3>
+          <h3 style="font-size: 14px; margin-bottom: 8px;">Brightness over time</h3>
+          <p class="helper-text" style="margin-bottom:8px;">The plot shows measured brightness. Repeating downward dips are the events the searches examine.</p>
           <div class="plot-container" id="plotContainer">
             <div id="plotPlaceholder" style="color:var(--text-muted); font-size:13px; padding:32px 16px;">
-              No diagnostic plot loaded. Upload a FITS file or enter a Candidate ID to generate phase-folded light curve views.
+              The light-curve plot will appear after analysis. It shows how the star’s measured brightness changes and where repeating dips may occur.
             </div>
             <img id="diagnosticPlot" src="" alt="Transit Diagnostics" style="display:none; max-width:100%; height:auto; border-radius:var(--radius-sm);" onerror="this.style.display='none'; document.getElementById('plotPlaceholder').style.display='block'; document.getElementById('plotPlaceholder').innerText='Diagnostic plot not available for this candidate.';">
           </div>
@@ -739,12 +743,22 @@
 
     function renderVettingResults(data) {
       const statusBanner = document.getElementById('statusBanner');
+      const sourceFileName = (data.fits_file_used || 'TESS light curve').split(/[\\/]/).pop();
       statusBanner.className = 'synthetic-banner';
-      statusBanner.style.background = 'rgba(16, 185, 129, 0.12)';
-      statusBanner.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-      statusBanner.style.color = '#a7f3d0';
-      statusBanner.textContent = `REAL OBSERVED DATA — Evaluated from TESS observation (${data.fits_file_used}).`;
+      if (data.is_synthetic) {
+        statusBanner.textContent = 'This is demonstration data, not a real TESS observation.';
+      } else {
+        statusBanner.style.background = 'rgba(16, 185, 129, 0.12)';
+        statusBanner.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        statusBanner.style.color = '#a7f3d0';
+        statusBanner.textContent = `Analyzed real TESS data: ${sourceFileName}`;
+      }
       statusBanner.style.display = 'flex';
+      if (data.report_url) {
+        const reportLink = document.getElementById('fullReportLink');
+        reportLink.href = data.report_url;
+        reportLink.style.display = 'inline-block';
+      }
 
       // Render upload audit if available
       const auditPanel = document.getElementById('uploadAuditPanel');
@@ -755,18 +769,26 @@
         document.getElementById('auditFileSize').innerText = `${(aud.file_size_bytes / (1024*1024)).toFixed(2)} MB`;
         const pill = document.getElementById('auditPipelinePill');
         const origin = aud.pipeline_origin || 'TESS_GENERIC';
-        pill.innerText = origin === 'TESS_QLP' ? 'QLP' : (origin === 'TESS_SPOC' ? 'SPOC' : 'GENERIC');
+        pill.innerText = origin === 'TESS_QLP' ? 'TESS QLP' : (origin === 'TESS_SPOC' ? 'TESS SPOC' : 'TESS file');
         pill.className = origin === 'TESS_QLP' ? 'pill pill-qlp' : (origin === 'TESS_SPOC' ? 'pill pill-spoc' : 'pill');
 
         const meta = aud.metadata || {};
-        document.getElementById('auditTargetSector').innerText = `TIC ${meta.tic_id || 'N/A'} | Sector ${meta.sector || 'N/A'}`;
+        document.getElementById('auditTargetSector').innerText = `Star ${meta.tic_id || 'not listed'} · observing sector ${meta.sector || 'not listed'}`;
         const cAudit = aud.cadence_audit || {};
-        document.getElementById('auditCadenceRetention').innerText = `${cAudit.usable_cadences || 0} / ${cAudit.raw_total_cadences || 0} (${cAudit.retention_percentage || 0}%)`;
-        document.getElementById('auditSegmentsCount').innerText = `${aud.segments ? aud.segments.length : 0} observing segments`;
+        document.getElementById('auditCadenceRetention').innerText = `${cAudit.usable_cadences || 0} of ${cAudit.raw_total_cadences || 0} measurements kept (${cAudit.retention_percentage || 0}%)`;
+        document.getElementById('auditSegmentsCount').innerText = `${aud.segments ? aud.segments.length : 0} stretches of observations`;
 
         const warnEl = document.getElementById('auditWarnings');
         if (aud.warnings && aud.warnings.length > 0) {
-          warnEl.innerHTML = `<strong>Warnings:</strong> ${aud.warnings.join('; ')}`;
+          const explainWarning = warning => {
+            const text = String(warning).toLowerCase();
+            if (text.includes('high cadence rejection')) return 'Many brightness readings were removed because they were flagged as unreliable.';
+            if (text.includes('ticid')) return 'The file did not identify the TESS star. Check the candidate ID.';
+            if (text.includes('sector')) return 'The file did not list an observing sector.';
+            if (text.includes('qlp')) return 'This is QLP data; some quality checks used for SPOC files do not apply.';
+            return String(warning).replace(/_/g, ' ');
+          };
+          warnEl.innerHTML = `<strong>Things to review:</strong> ${aud.warnings.map(explainWarning).join(' ')}`;
         } else {
           warnEl.innerHTML = '';
         }
@@ -774,38 +796,55 @@
         auditPanel.style.display = 'none';
       }
 
-      document.getElementById('valBaselineScore').innerText = data.baseline_score !== null ? data.baseline_score.toFixed(4) : 'N/A';
-      document.getElementById('valBaselineMode').innerText = `[${data.baseline_execution_mode || 'BASELINE_UNAVAILABLE'}]`;
-      document.getElementById('noteBaseline').innerText = data.baseline_score !== null ? 'ExoMiner baseline model score' : 'Baseline unavailable in catalog / container daemon absent';
+      document.getElementById('valBaselineScore').innerText = data.baseline_score !== null ? `${(data.baseline_score * 100).toFixed(1)} / 100` : 'Not available';
+      document.getElementById('valBaselineMode').innerText = data.baseline_score !== null ? 'NASA comparison available' : 'No NASA comparison available';
+      document.getElementById('noteBaseline').innerText = data.baseline_score !== null ? 'Score from the NASA ExoMiner reference model.' : 'A reference score was not available for this target.';
 
-      document.getElementById('valAstrovetScore').innerText = data.astrovet_raw_score !== null ? data.astrovet_raw_score.toFixed(4) : 'N/A';
-      document.getElementById('valAstrovetMode').innerText = `[${data.score_type ? data.score_type.toUpperCase() : 'HEURISTIC'}]`;
-      document.getElementById('noteAstrovet').innerText = data.score_type === 'fitted_fusion_score' ? 'Fitted fusion ranking score (not a probability)' : 'Heuristic triage score (uncalibrated)';
+      document.getElementById('valAstrovetScore').innerText = data.astrovet_raw_score !== null ? `${(data.astrovet_raw_score * 100).toFixed(1)} / 100` : 'Not available';
+      document.getElementById('valAstrovetMode').innerText = data.score_type === 'fitted_fusion_score' ? 'Trained research model' : 'Rule-based estimate';
+      document.getElementById('noteAstrovet').innerText = data.score_type === 'fitted_fusion_score' ? 'Higher values rank as more planet-like for review; this is not a probability.' : 'This estimate uses available checks and is not a probability.';
 
-      document.getElementById('valCalibratedProb').innerText = data.calibrated_planet_like_probability !== null ? data.calibrated_planet_like_probability.toFixed(4) : 'N/A';
-      document.getElementById('valCalibratedMode').innerText = data.is_calibrated ? '[CALIBRATED]' : '[NOT_CALIBRATED]';
+      document.getElementById('valCalibratedProb').innerText = data.calibrated_planet_like_probability !== null ? `${(data.calibrated_planet_like_probability * 100).toFixed(1)}%` : 'Not available';
+      document.getElementById('valCalibratedMode').innerText = data.is_calibrated ? 'Selected research sample' : 'No comparison sample';
       const calibrationScope = data.calibration_provenance || '';
       document.getElementById('noteCalibrated').innerText = !data.is_calibrated
-        ? 'No fitted calibrator supplied'
+        ? 'No comparison score was available for this run.'
         : (calibrationScope.toLowerCase().includes('selected toi')
-          ? 'Calibrated on selected TOI follow-up hosts; not a population-wide probability'
-          : 'Fitted Platt calibration; check report for scope');
+          ? 'Matches from a selected group of followed-up candidates; not the chance for all stars.'
+          : 'Calibrated score; see the report for which sample it applies to.');
 
-      document.getElementById('valUncertainty').innerText = data.predictive_uncertainty !== null ? `±${data.predictive_uncertainty.toFixed(3)}` : 'N/A';
-      document.getElementById('valUncertaintyMode').innerText = (data.predictive_uncertainty !== null && data.predictive_uncertainty < 0.3) ? '[LOW_UNCERTAINTY]' : '[HIGH_UNCERTAINTY]';
-      document.getElementById('noteUncertainty').innerText = (data.predictive_uncertainty !== null && data.predictive_uncertainty < 0.3) ? 'Within confidence margin' : 'Human review required for final triage';
+      const hasUncertainty = data.predictive_uncertainty !== null && data.predictive_uncertainty !== undefined;
+      const lowerUncertainty = hasUncertainty && data.predictive_uncertainty < 0.3;
+      document.getElementById('valUncertainty').innerText = hasUncertainty ? (lowerUncertainty ? 'Lower' : 'Higher') : 'Not available';
+      document.getElementById('valUncertaintyMode').innerText = hasUncertainty ? 'Model estimate' : 'Not measured';
+      document.getElementById('noteUncertainty').innerText = hasUncertainty ? 'Higher uncertainty means the result needs extra care and human review.' : 'The model could not estimate how uncertain this result is.';
 
-      document.getElementById('sslStatus').innerText = data.ssl_representation_available ? 'ACTIVE (real-data encoder)' : 'UNAVAILABLE (checkpoint not configured)';
+      document.getElementById('sslStatus').innerText = data.ssl_representation_available ? 'Used' : 'Not available';
       const scoreExplanation = data.score_explanation || {};
-      const explanationLines = [`Basis: ${scoreExplanation.basis || 'unavailable'}`];
-      if (scoreExplanation.positive_signal) {
-        explanationLines.push(`Positive input: ${scoreExplanation.positive_signal.feature} = ${Number(scoreExplanation.positive_signal.value).toFixed(4)}`);
-        Object.entries(scoreExplanation.penalties || {}).forEach(([name, value]) => explanationLines.push(`Penalty (${name.replace(/_/g, ' ')}): ${Number(value).toFixed(4)}`));
+      const featureName = name => String(name || 'Other measurement')
+        .replace(/log10_period/gi, 'time between repeating dips')
+        .replace(/log10_duration/gi, 'length of a dip')
+        .replace(/transit_depth/gi, 'depth of a dip')
+        .replace(/ssl_/gi, 'brightness-pattern ')
+        .replace(/transit_snr/gi, 'transit signal strength')
+        .replace(/period_agreement/gi, 'agreement between the two searches')
+        .replace(/odd_even/gi, 'difference between alternating dips')
+        .replace(/secondary_eclipse/gi, 'additional dip between transits')
+        .replace(/_/g, ' ');
+      const explanationLines = [];
+      if (scoreExplanation.top_contributions && scoreExplanation.top_contributions.length) {
+        explanationLines.push('Measurements that most influenced the score:');
+        scoreExplanation.top_contributions.slice(0, 4).forEach(item => {
+          const direction = Number(item.logit_contribution) >= 0 ? 'pushed the score higher' : 'pushed the score lower';
+          explanationLines.push(`• ${featureName(item.feature)} ${direction}.`);
+        });
+      } else if (scoreExplanation.positive_signal) {
+        explanationLines.push('The strongest available signal was ' + featureName(scoreExplanation.positive_signal.feature) + '.');
+        Object.keys(scoreExplanation.penalties || {}).forEach(name => explanationLines.push(`• The check for ${featureName(name)} lowered the score.`));
+      } else {
+        explanationLines.push('A detailed explanation was not available for this result.');
       }
-      if (scoreExplanation.top_contributions) {
-        scoreExplanation.top_contributions.forEach(item => explanationLines.push(`${item.feature}: ${Number(item.logit_contribution).toFixed(5)} logit`));
-      }
-      if (scoreExplanation.note) explanationLines.push(scoreExplanation.note);
+      if (scoreExplanation.note && !scoreExplanation.top_contributions) explanationLines.push('These are clues used by the model, not proof of what caused the signal.');
       document.getElementById('scoreExplanation').innerText = explanationLines.join('\n');
 
       const badge = document.getElementById('triageBadge');
@@ -834,34 +873,34 @@
       const pBody = document.getElementById('physicsTableBody');
       pBody.innerHTML = `
         <tr>
-          <td>Transit Template Depth</td>
-          <td class="font-mono">${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? diag.transit_depth_fitted_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
-          <td><span style="color:${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? '#10b981' : '#94a3b8'};">${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? 'Available' : 'N/A'}</span></td>
-          <td>Limb-darkened template fit</td>
+          <td>How deep is the dip?</td>
+          <td class="font-mono">${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? diag.transit_depth_fitted_ppm.toFixed(2) + ' ppm' : 'Not measured'}</td>
+          <td><span style="color:${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? '#10b981' : '#94a3b8'};">${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? 'Measured' : 'Not measured'}</span></td>
+          <td>Estimated depth of the brightness drop.</td>
         </tr>
         <tr>
-          <td>Transit Duration</td>
-          <td class="font-mono">${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? diag.transit_duration_fitted_hours.toFixed(3) + ' hours' : 'N/A'}</td>
-          <td><span style="color:${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? '#10b981' : '#94a3b8'};">${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? 'Available' : 'N/A'}</span></td>
-          <td>Contact I-IV estimate</td>
+          <td>How long does the dip last?</td>
+          <td class="font-mono">${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? diag.transit_duration_fitted_hours.toFixed(3) + ' hours' : 'Not measured'}</td>
+          <td><span style="color:${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? '#10b981' : '#94a3b8'};">${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? 'Measured' : 'Not measured'}</span></td>
+          <td>Estimated time the star stays dimmer.</td>
         </tr>
         <tr>
-          <td>Reduced &chi;<sup>2</sup></td>
-          <td class="font-mono">${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? diag.fit_chi2_reduced.toFixed(3) : 'N/A'}</td>
-          <td><span style="color:${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? '#10b981' : '#94a3b8'};">${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? 'Available' : 'N/A'}</span></td>
-          <td>Residual template goodness-of-fit</td>
+          <td>How well does the shape fit?</td>
+          <td class="font-mono">${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? diag.fit_chi2_reduced.toFixed(3) : 'Not measured'}</td>
+          <td><span style="color:${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? '#10b981' : '#94a3b8'};">${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? 'Measured' : 'Not measured'}</span></td>
+          <td>Shows how closely the measured dip matches a model shape; interpret with other checks.</td>
         </tr>
         <tr>
-          <td>Odd vs. Even Consistency</td>
-          <td class="font-mono">${diag.odd_even_depth_diff_ppm !== null && diag.odd_even_depth_diff_ppm !== undefined ? '&Delta; = ' + diag.odd_even_depth_diff_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
-          <td><span style="color:${diag.odd_even_consistent ? '#10b981' : (diag.odd_even_consistent === false ? '#ef4444' : '#94a3b8')};">${diag.odd_even_consistent === true ? 'Consistent' : (diag.odd_even_consistent === false ? 'Discrepant' : 'N/A')}</span></td>
-          <td>Odd/even consistency screen</td>
+          <td>Are alternating dips alike?</td>
+          <td class="font-mono">${diag.odd_even_depth_diff_ppm !== null && diag.odd_even_depth_diff_ppm !== undefined ? 'Difference: ' + diag.odd_even_depth_diff_ppm.toFixed(2) + ' ppm' : 'Not measured'}</td>
+          <td><span style="color:${diag.odd_even_consistent ? '#10b981' : (diag.odd_even_consistent === false ? '#ef4444' : '#94a3b8')};">${diag.odd_even_consistent === true ? 'Similar' : (diag.odd_even_consistent === false ? 'Different' : 'Not checked')}</span></td>
+          <td>Large differences between alternating dips can be a warning sign.</td>
         </tr>
         <tr>
-          <td>Secondary Eclipse</td>
-          <td class="font-mono">${diag.secondary_depth_ppm !== null && diag.secondary_depth_ppm !== undefined ? 'Depth = ' + diag.secondary_depth_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
-          <td><span style="color:${diag.secondary_eclipse_detected ? '#ef4444' : (diag.secondary_eclipse_detected === false ? '#10b981' : '#94a3b8')};">${diag.secondary_eclipse_detected ? 'Detected (EB risk)' : (diag.secondary_eclipse_detected === false ? 'Not detected' : 'N/A')}</span></td>
-          <td>Phase 0.5 occultation search</td>
+          <td>Is there another dip between transits?</td>
+          <td class="font-mono">${diag.secondary_depth_ppm !== null && diag.secondary_depth_ppm !== undefined ? 'Dip depth: ' + diag.secondary_depth_ppm.toFixed(2) + ' ppm' : 'Not measured'}</td>
+          <td><span style="color:${diag.secondary_eclipse_detected ? '#ef4444' : (diag.secondary_eclipse_detected === false ? '#10b981' : '#94a3b8')};">${diag.secondary_eclipse_detected ? 'Found; may be a second star' : (diag.secondary_eclipse_detected === false ? 'Not found' : 'Not checked')}</span></td>
+          <td>A second dip can occur with an eclipsing binary star.</td>
         </tr>
       `;
 
@@ -876,28 +915,42 @@
       if (data.periodogram) {
         const bls = data.periodogram.bls || {};
         const tls = data.periodogram.tls || {};
+        const explainAgreement = result => {
+          if (!result.compared_to_ephemeris) return 'No known period supplied to compare';
+          if (result.is_period_match) return `Close match (${result.period_diff_percent}% difference)`;
+          if (result.is_harmonic) return 'Related repeating periods found';
+          return `Does not closely match (${result.period_diff_percent || 'unknown'}% difference)`;
+        };
+        const explainUnavailable = reason => {
+          const text = String(reason || '').toLowerCase();
+          if (text.includes('sparse') || text.includes('insufficient')) return 'Not enough clean measurements for this search.';
+          if (text.includes('not executed')) return 'This search was not run.';
+          return reason ? `This search could not run: ${String(reason).replace(/_/g, ' ')}.` : 'This search result is unavailable.';
+        };
 
         if (bls.is_available) {
           document.getElementById('blsPeriod').innerText = `${bls.best_period_days.toFixed(4)} d`;
-          document.getElementById('blsMetric').innerText = `SNR = ${bls.peak_snr}`;
+          document.getElementById('blsMetric').innerText = `Strength ${bls.peak_snr} (SNR)`;
           document.getElementById('blsEpoch').innerText = bls.best_t0_btjd ? bls.best_t0_btjd.toFixed(4) : '--';
           document.getElementById('blsDuration').innerText = bls.best_duration_hours ? `${bls.best_duration_hours.toFixed(2)} h` : '--';
-          document.getElementById('blsAgreement').innerText = bls.compared_to_ephemeris ? (bls.is_period_match ? `Match (${bls.period_diff_percent}%)` : (bls.is_harmonic ? `Harmonic (${bls.harmonic_relation})` : `Diff: ${bls.period_diff_percent || 'N/A'}%`)) : 'Recovered';
+          document.getElementById('blsAgreement').innerText = explainAgreement(bls);
         } else {
           document.getElementById('blsPeriod').innerText = 'Unavailable';
-          document.getElementById('blsMetric').innerText = bls.reason || 'Not executed';
+          document.getElementById('blsMetric').innerText = explainUnavailable(bls.reason);
+          document.getElementById('blsAgreement').innerText = 'Not checked';
         }
 
         if (tls.is_available) {
           document.getElementById('tlsPeriod').innerText = `${tls.best_period_days.toFixed(4)} d`;
-          document.getElementById('tlsMetric').innerText = `SDE = ${tls.sde}`;
+          document.getElementById('tlsMetric').innerText = `Strength ${tls.sde} (SDE)`;
           document.getElementById('tlsEpoch').innerText = tls.best_t0_btjd ? tls.best_t0_btjd.toFixed(4) : '--';
           document.getElementById('tlsDuration').innerText = tls.best_duration_hours ? `${tls.best_duration_hours.toFixed(2)} h` : '--';
-          document.getElementById('tlsOddEven').innerText = tls.odd_even_mismatch !== null ? tls.odd_even_mismatch.toFixed(2) : '--';
-          document.getElementById('tlsAgreement').innerText = tls.compared_to_ephemeris ? (tls.is_period_match ? `Match (${tls.period_diff_percent}%)` : (tls.is_harmonic ? `Harmonic (${tls.harmonic_relation})` : `Diff: ${tls.period_diff_percent || 'N/A'}%`)) : 'Recovered';
+          document.getElementById('tlsOddEven').innerText = diag.odd_even_consistent === true ? 'Similar' : (diag.odd_even_consistent === false ? 'Different' : 'Not checked');
+          document.getElementById('tlsAgreement').innerText = explainAgreement(tls);
         } else {
           document.getElementById('tlsPeriod').innerText = 'Unavailable';
-          document.getElementById('tlsMetric').innerText = tls.reason || 'Not executed';
+          document.getElementById('tlsMetric').innerText = explainUnavailable(tls.reason);
+          document.getElementById('tlsAgreement').innerText = 'Not checked';
         }
       }
     }
