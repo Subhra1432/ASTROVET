@@ -41,11 +41,24 @@ This checks depth preservation for one injection per file. It does not establish
 
 The request-size check runs before reading the declared request body. These checks cover representative failures; they do not replace fuzzing or a full security review.
 
+## Docker baseline and hardware check
+
+**Checked:** 2026-10-30 on the workstation running this dashboard.
+
+- Docker Desktop is installed and its daemon is running. The pinned NASA ExoMiner image is present locally (about 16.3 GB).
+- The dashboard uses the lightweight published-catalog lookup by default. The advanced option **Also run NASA ExoMiner in Docker for a comparison** explicitly requests the slower container run.
+- A real SPOC candidate was sent through that container path. ASTROVET's integration input was corrected to give the official pipeline an integer TIC CSV in its writable output mount. ExoMiner began inference, then returned `All model predictions failed ... Probably due to out-of-memory`. Docker reports about 8.15 GB of memory available on this machine. The run produced no baseline score, so the app leaves it unavailable and explains why.
+- The pinned ExoMiner container's `run_pipeline.py` calls `tf.config.set_visible_devices([], 'GPU')` and prints that GPUs are disabled. Its log also reported no CUDA driver inside the container. ASTROVET's current self-supervised encoder is vectorized NumPy designed for CPU use. Docker provides an isolated runtime; it does not automatically accelerate CPU implementations with the desktop GPU.
+- The dashboard is now started with the trained SSL encoder and fusion artifact using `scripts/start_dashboard_with_trained_model.ps1`. A real SPOC upload returns ASTROVET score `0.6942` and selected-sample calibrated score `0.7178` (displayed as `71.8%`). That score is limited to a selected TOI follow-up cohort; it is not a planet probability for the general TESS population.
+
+The ExoMiner score must stay unavailable until either the candidate is found in the reference catalog or the container can finish inference within its available memory. Do not replace a missing score with zero or a fabricated value. Enabling GPU use would require a separately validated GPU-capable ASTROVET implementation and a changed ExoMiner image; the pinned NASA baseline is left unchanged.
+
 ## Automated checks
 
 - Repository test suite: **76 passed, 1 warning** after the browser-depth field addition.
 - Added model/checkpoint compatibility tests ensure the inference encoder matches the checkpoint used to train the fusion model.
 - Manual real-file integration harness verified upload audit, report retrieval, CLI/browser parity, and the three rejection cases listed above.
+- The later UI/ExoMiner container changes have not had a full repository test-suite rerun yet; their selected SPOC API and container paths were exercised directly.
 
 ## Validation boundary and next evidence
 

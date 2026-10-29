@@ -102,6 +102,10 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
             fits_file_param = query.get("fits_file", [None])[0]
             fits_file = fits_file_param.strip() if fits_file_param and fits_file_param.strip() else None
             retrieve_mast = query.get("retrieve_mast", ["false"])[0].lower() in ["true", "1", "yes"]
+            baseline_mode = query.get("baseline_mode", [os.environ.get("ASTROVET_BASELINE_MODE", "catalog")])[0]
+            if baseline_mode not in {"catalog", "container"}:
+                self._send_json_error(400, "baseline_mode must be 'catalog' or 'container'.")
+                return
 
             # Security: prevent arbitrary filesystem access from browser
             if fits_file:
@@ -192,6 +196,7 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                     epoch=epoch,
                     duration=duration,
                     depth=depth,
+                    baseline_mode=baseline_mode,
                 )
                 self._send_json_success(payload)
             except Exception as e:
@@ -233,6 +238,7 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
             epoch: Optional[float] = None
             duration: Optional[float] = None
             depth: Optional[float] = None
+            baseline_mode = os.environ.get("ASTROVET_BASELINE_MODE", "catalog")
 
             if "multipart/form-data" in content_type:
                 # Parse standard multipart/form-data using standard library email parser
@@ -281,6 +287,10 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                                 depth = val
                         except Exception:
                             pass
+                    elif name == "baseline_mode" and payload:
+                        value = payload.decode("utf-8", errors="ignore").strip().lower()
+                        if value in {"catalog", "container"}:
+                            baseline_mode = value
             else:
                 # Raw binary upload with query parameters
                 file_bytes = body_bytes
@@ -289,6 +299,8 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                     filename = query["filename"][0]
                 if "candidate_id" in query and query["candidate_id"][0]:
                     candidate_id = query["candidate_id"][0].strip()
+                if query.get("baseline_mode") and query["baseline_mode"][0] in {"catalog", "container"}:
+                    baseline_mode = query["baseline_mode"][0]
                 try:
                     if "period" in query and query["period"][0]:
                         period = float(query["period"][0])
@@ -355,6 +367,7 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                     epoch=epoch,
                     duration=duration,
                     depth=depth,
+                    baseline_mode=baseline_mode,
                 )
                 payload["upload_audit"] = audit_result
                 self._send_json_success(payload)
@@ -375,6 +388,7 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
         epoch: Optional[float] = None,
         duration: Optional[float] = None,
         depth: Optional[float] = None,
+        baseline_mode: str = "catalog",
     ) -> Dict[str, Any]:
         """Run complete vetting pipeline strictly with real observed data."""
         res = vet_and_generate_report(
@@ -385,6 +399,7 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
             epoch=epoch,
             duration=duration,
             depth=depth,
+            baseline_mode=baseline_mode,
             search_periods=True,
             synthetic_fixture_ok=False,
             allow_synthetic=False,
@@ -393,7 +408,28 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
         )
         pred = res["prediction"]
         b_pred = pred.baseline_prediction
-        b_mode = b_pred.execution_mode if (b_pred and b_pred.score is not None) else "BASELINE_UNAVAILABLE"
+        b_mode = b_pred.execution_mode if b_pred else "UNAVAILABLE"
+        baseline_status = b_pred.status if b_pred else "NOT_RUN"
+        baseline_message = None
+        if pred.baseline_score is None:
+            raw = (b_pred.raw_output or {}) if b_pred else {}
+            container_error = raw.get("container_error")
+            if b_pred and b_pred.execution_mode == "CONTAINER_PROCESS":
+                container_error = container_error or raw.get("stderr") or raw.get("error")
+            if raw.get("container_notice"):
+                baseline_message = "Docker is not available right now, so the NASA comparison could not run."
+            elif container_error:
+                error_text = str(container_error)
+                if "out-of-memory" in error_text.lower() or "out of memory" in error_text.lower():
+                    baseline_message = "The Docker baseline started but ran out of memory before returning a score."
+                elif "timeout" in error_text.lower():
+                    baseline_message = "The Docker comparison took too long and stopped before returning a score."
+                else:
+                    baseline_message = "The Docker baseline did not return a score. See the detailed report for its run status."
+            elif baseline_mode == "container":
+                baseline_message = "The Docker baseline did not return a score for this candidate."
+            else:
+                baseline_message = "This candidate has no matching score in the local ExoMiner reference catalog. The Docker comparison was not run."
         is_synthetic = bool(pred.is_synthetic or (b_pred and b_pred.is_synthetic))
 
         pdiag = pred.physics_diagnostics
@@ -403,6 +439,8 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
             "candidate_id": pred.candidate_id,
             "baseline_score": pred.baseline_score,
             "baseline_execution_mode": b_mode,
+            "baseline_status": baseline_status,
+            "baseline_message": baseline_message,
             "astrovet_raw_score": pred.astrovet_raw_score,
             "score_type": pred.score_type,
             "is_calibrated": pred.is_calibrated,

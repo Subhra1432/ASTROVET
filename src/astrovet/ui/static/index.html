@@ -397,6 +397,12 @@
               <span>Download the SPOC file from NASA MAST if it is not already available</span>
             </label>
           </div>
+          <div class="form-group" style="margin-top:10px;">
+            <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; cursor:pointer; color:var(--accent-blue);">
+              <input type="checkbox" id="dockerBaselineCheck">
+              <span>Also run NASA ExoMiner in Docker for a comparison<br><span class="helper-text">This is slower and can need several gigabytes of memory. It does not make the rest of ASTROVET use the graphics card.</span></span>
+            </label>
+          </div>
           <div style="border-top:1px solid var(--border); padding-top:12px; margin-top:12px;">
             <span style="font-size:13px; font-weight:600;">Known transit measurements</span>
             <p class="helper-text" style="margin:4px 0 10px;">Enter these only if you already have them. Otherwise ASTROVET searches the light curve.</p>
@@ -664,6 +670,7 @@
       if (duration) formData.append('duration', duration);
       const depth = document.getElementById('depth').value.trim();
       if (depth) formData.append('depth', depth);
+      formData.append('baseline_mode', document.getElementById('dockerBaselineCheck').checked ? 'container' : 'catalog');
 
       try {
         const resp = await fetch('/api/upload_and_vet', {
@@ -710,6 +717,7 @@
       const epoch = document.getElementById('epoch').value.trim();
       const duration = document.getElementById('duration').value.trim();
       const depth = document.getElementById('depth').value.trim();
+      const baselineMode = document.getElementById('dockerBaselineCheck').checked ? 'container' : 'catalog';
 
       const params = new URLSearchParams();
       params.append('candidate_id', candidateId);
@@ -719,6 +727,7 @@
       if (epoch) params.append('epoch', epoch);
       if (duration) params.append('duration', duration);
       if (depth) params.append('depth', depth);
+      params.append('baseline_mode', baselineMode);
 
       try {
         const resp = await fetch(`/api/vet?${params.toString()}`);
@@ -798,7 +807,9 @@
 
       document.getElementById('valBaselineScore').innerText = data.baseline_score !== null ? `${(data.baseline_score * 100).toFixed(1)} / 100` : 'Not available';
       document.getElementById('valBaselineMode').innerText = data.baseline_score !== null ? 'NASA comparison available' : 'No NASA comparison available';
-      document.getElementById('noteBaseline').innerText = data.baseline_score !== null ? 'Score from the NASA ExoMiner reference model.' : 'A reference score was not available for this target.';
+      document.getElementById('noteBaseline').innerText = data.baseline_score !== null
+        ? 'Score from the NASA ExoMiner model. Higher scores indicate a closer match to its planet-like class.'
+        : (data.baseline_message || 'A reference score was not available for this target.');
 
       document.getElementById('valAstrovetScore').innerText = data.astrovet_raw_score !== null ? `${(data.astrovet_raw_score * 100).toFixed(1)} / 100` : 'Not available';
       document.getElementById('valAstrovetMode').innerText = data.score_type === 'fitted_fusion_score' ? 'Trained research model' : 'Rule-based estimate';
@@ -808,7 +819,9 @@
       document.getElementById('valCalibratedMode').innerText = data.is_calibrated ? 'Selected research sample' : 'No comparison sample';
       const calibrationScope = data.calibration_provenance || '';
       document.getElementById('noteCalibrated').innerText = !data.is_calibrated
-        ? 'No comparison score was available for this run.'
+        ? (data.score_type === 'uncalibrated_heuristic'
+          ? 'The trained comparison model is not loaded. Start the dashboard with the trained-model launcher.'
+          : 'This model did not provide a calibrated comparison score.')
         : (calibrationScope.toLowerCase().includes('selected toi')
           ? 'Matches from a selected group of followed-up candidates; not the chance for all stars.'
           : 'Calibrated score; see the report for which sample it applies to.');

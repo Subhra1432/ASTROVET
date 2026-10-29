@@ -15,6 +15,7 @@ import json
 import os
 import shutil
 import subprocess
+import csv
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -70,8 +71,8 @@ class ExoMinerContainerRunner:
         out_path = str(Path(output_dir).resolve())
         engine_bin = self.engine or "podman"
 
-        # Official ExoMiner's image entrypoint is run_pipeline.py. It takes
-        # --tic_ids / --output_dir options (not the fictional run --tic CLI).
+        # The official image entrypoint is run_pipeline.py; it accepts a TIC
+        # CSV via --tic_ids_fp and an output directory.
         cmd = [
             engine_bin,
             "run",
@@ -80,7 +81,7 @@ class ExoMinerContainerRunner:
             "-v", f"{out_path}:/workspace/output",
             self.image_name,
             "--output_dir=/workspace/output",
-            "--tic_ids", f"{tic_id}_{sector}",
+            "--tic_ids_fp", "/workspace/output/tics_tbl.csv",
             "--data_collection_mode=2min",
             "--num_processes=1",
             "--num_jobs=1",
@@ -127,6 +128,17 @@ class ExoMinerContainerRunner:
                 "epoch_btjd": epoch,
                 "duration_hours": duration_hours,
             }, f, indent=2)
+
+        # The official pipeline writes back to its TIC CSV during setup, so
+        # keep that generated file on the writable output mount. Use numeric
+        # TIC values and the documented sector range format.
+        sector_run = str(sector).strip()
+        if "-" not in sector_run:
+            sector_run = f"{sector_run}-{sector_run}"
+        with open(out_dir / "tics_tbl.csv", "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(("tic_id", "sector_run"))
+            writer.writerow((int(tic_id), sector_run))
 
         # The NASA pipeline consumes SPOC 2-minute FITS plus DV XML. QLP or
         # non-2-minute uploads are not valid substitutes; let the official
