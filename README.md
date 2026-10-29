@@ -14,7 +14,7 @@
 
 ASTROVET combines four complementary evidence branches into a late-fusion layer:
 
-1. **NASA ExoMiner++ reference adapter:** The code records release metadata (`v1.0.0`, commit `d877a23`) and supports optional catalog lookup or container execution. The NASA upstream checkout and prediction catalog are not present in this workspace, so their local integrity and availability are not verified. Missing baseline predictions remain unavailable; ASTROVET does not invent scores.
+1. **NASA ExoMiner++ reference adapter:** The code records release metadata (`v1.0.0`, commit `d877a23`) and supports published-catalog lookup or container execution. In the requested D: workspace, the untouched NASA upstream source checkout and its prediction catalog are present beside ASTROVET and the catalog is auto-discovered for local lookups. Missing baseline predictions remain unavailable; ASTROVET does not invent scores.
 2. **Transit Periodicity Verification (BLS & TLS):** Box Least Squares (Astropy BLS) and Transit Least Squares (TLS, `transitleastsquares>=2.0.0`) recover or compare transit-like periodicity. TLS uses limb-darkened transit templates. Period, epoch (BTJD), duration, and common period harmonics are compared; a detected periodic signal is not a planet validation.
 3. **Physics-Informed Diagnostics:** Approximate limb-darkened transit template fitting (for residual baseline estimation), cadence-level and per-event odd vs even depth tests (eclipsing binary screen with propagated uncertainty), secondary eclipse search (phase ~0.5), and cross-event depth/timing scatter.
 4. **Self-Supervised Light-Curve Representations:** Neural representation learner (`SelfSupervisedTransitEncoder`) optimizing a joint Masked Cadence Autoencoding (MAE) and View-Consistency contrastive objective over physically augmented folded transit views (cadence dropouts and bounded jitter), alongside an unsupervised PCA prototype encoder (`LightCurvePCAPrototypeEncoder`). Supports pretraining directly from real unlabeled TESS FITS light curves (`--input-fits` or `--input-fits-dir`) or pre-extracted views, recording complete checkpoint provenance (`REAL_TESS_FITS` vs `--synthetic-demo`). Pretraining over the full 60+ sector TESS archive requires GPU cluster compute.
@@ -39,9 +39,9 @@ ASTROVET combines four complementary evidence branches into a late-fusion layer:
 
 ## 2. Workspace & Boundary Structure
 
-The current checkout contains ASTROVET only. It does not contain a separate NASA ExoMiner checkout or Git metadata, so this README does not claim that a local upstream checkout was preserved or verified.
+This ASTROVET checkout is kept separate from the NASA upstream source. In the requested D: workspace, the untouched upstream source is at `D:\Final Year Projet\ExoMiner-main\ExoMiner-main` and its published prediction catalog is auto-discovered for local baseline lookups. The upstream directory has no Git metadata in this workspace; its files are not modified by ASTROVET.
 
-- `E:\Final Year Projet\ExoMiner-main\astrovet`: ASTROVET source, configuration, tests, and documentation.
+- `D:\Final Year Projet\ExoMiner-main\astrovet`: ASTROVET source, configuration, tests, and documentation.
 - `data/raw/mast/`: locally downloaded observations, ignored by Git.
 - `data/fixtures/`: synthetic FITS files used by automated tests only.
 - `artifacts/` and `data/checkpoints/`: generated reports/checkpoints, not validated model releases.
@@ -102,7 +102,7 @@ Because `astrovet` uses a `src/` package layout, install the package in editable
 
 ```powershell
 # Navigate into the ASTROVET project directory
-cd "E:\Final Year Projet\ExoMiner-main\astrovet"
+cd "D:\Final Year Projet\ExoMiner-main\astrovet"
 
 # Install package in editable mode
 py -m pip install -e .
@@ -154,7 +154,49 @@ py -m astrovet.cli ssl pretrain --input-fits "data/raw/mast/tess_s0023_390651552
 py -m astrovet.cli ssl pretrain --input-fits-dir "data/raw/mast" --epochs 5 --output-checkpoint "data/checkpoints/ssl_transit_encoder.npz"
 
 ```
-*(A vetting run without `--ssl-checkpoint` omits SSL embeddings and records that modality as unavailable. Self-supervised pretraining alone does not train or validate the candidate classifier. Fitted fusion scores and calibrated probabilities require labeled, host-disjoint training, calibration, and test cohorts; these datasets and a production training workflow are not bundled.)*
+*(A vetting run without `--ssl-checkpoint` omits SSL embeddings and records that modality as unavailable. Self-supervised pretraining alone does not train a planet/non-planet decision head.)*
+
+### 5a. Rebuild the Real-Label Research Cohort and Prototype
+
+The project workspace includes scripts to match official MAST sector TCE statistics to the NASA Exoplanet Archive TOI disposition snapshot. `CP`/`KP` are positive; `FP`/`FA` are negative; `PC`/`APC`/unset remain unlabeled and are excluded. The generated research-only classifier uses host-disjoint train/validation/calibration/test splits. It is **not** connected to FITS upload inference and its probabilities are not population-calibrated because TOIs are a selected follow-up sample.
+
+```powershell
+py scripts\prepare_planet_disposition_cohort.py `
+  --tce-dir "D:\Final Year Projet\ASTROVET_data\raw\mast_tce_single_sector" `
+  --toi-csv "D:\Final Year Projet\ASTROVET_data\labels\nasa_exoplanet_archive_toi_dispositions.csv" `
+  --output-dir "D:\Final Year Projet\ASTROVET_data\labels\planet_cohort"
+
+py scripts\train_planet_disposition_prototype.py `
+  --cohort "D:\Final Year Projet\ASTROVET_data\labels\planet_cohort\planet_disposition_cohort.csv" `
+  --output-dir "D:\Final Year Projet\ASTROVET_data\artifacts\models\planet_disposition_prototype"
+```
+
+The scripts save source hashes, disposition counts, host split IDs, a test evaluation report, and a catalog-statistics research artifact. The catalog-statistics artifact is not a FITS-vetting model. The next workflow builds and evaluates an SSL-plus-physics head using a single inference-aligned feature vector:
+
+```powershell
+py scripts\train_ssl_physics_fusion.py `
+  --cohort "D:\Final Year Projet\ASTROVET_data\labels\planet_cohort\planet_disposition_cohort.csv" `
+  --download-manifest "D:\Final Year Projet\ASTROVET_data\raw\planet_disposition_lc_batch\download_manifest.json" `
+  --split-manifest "D:\Final Year Projet\ASTROVET_data\labels\planet_cohort\planet_ssl_host_split_manifest.json" `
+  --ssl-checkpoint "D:\Final Year Projet\ASTROVET_data\artifacts\models\planet_disposition_prototype\ssl_encoder_trainhosts_v1.npz" `
+  --output-dir "D:\Final Year Projet\ASTROVET_data\artifacts\models\planet_disposition_prototype\ssl_physics_fusion"
+```
+
+The output includes `astrovet_ssl_physics_fusion_research.joblib`, host split IDs, an event-level feature audit, and untouched test metrics. The trained bundle can be enabled for the UI explicitly; in PowerShell, set the two environment variables before starting the dashboard:
+
+```powershell
+$env:ASTROVET_SSL_CHECKPOINT = "D:\Final Year Projet\ASTROVET_data\artifacts\models\planet_disposition_prototype\ssl_encoder_trainhosts_v1.npz"
+$env:ASTROVET_FUSION_MODEL = "D:\Final Year Projet\ASTROVET_data\artifacts\models\planet_disposition_prototype\ssl_physics_fusion\astrovet_ssl_physics_fusion_research.joblib"
+py -m astrovet.cli ui --port 8080
+```
+
+Or start the dashboard with these trained artifacts in one command:
+
+```powershell
+.\scripts\start_dashboard_with_trained_model.ps1
+```
+
+The dashboard and reports label the output as a selected-TOI-cohort calibrated score, not a population-wide planet probability. It still requires human review and independent validation on a broader sample before any scientific population claims.
 
 ### 6. Run Transit Periodicity Search (BLS & TLS)
 Run Box Least Squares (Astropy BLS) and Transit Least Squares (TLS) on real light curve FITS data to recover or verify periodicity:
@@ -182,6 +224,8 @@ py -m astrovet.cli explain --candidate-id "390651552-1-S23" --fits-file "data/ra
 # Note: If container daemon is absent, reports CONTAINER_RUNTIME_UNAVAILABLE honestly rather than claiming live execution.
 py -m astrovet.cli explain --candidate-id "390651552-1-S23" --fits-file "data/raw/mast/tess_s0023_390651552_spoc_lc.fits" --baseline-mode container --container-fallback
 ```
+
+The browser dashboard automatically loads `artifacts/models/ssl_encoder_real_qlp_trainhosts_v2.npz` when present, then falls back to `data/checkpoints/ssl_transit_encoder.npz`. Set `ASTROVET_SSL_CHECKPOINT` to override this path. Without a fitted checkpoint, the UI reports the SSL representation as unavailable; the score remains an uncalibrated heuristic unless a compatible, validated fusion artifact is provided.
 *(Real-Data Requirement: Normal workflows require observed FITS data; missing data raises a clear error. Synthetic fixtures are test-only and are not used as scientific results.)*
 
 ---

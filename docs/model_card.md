@@ -1,48 +1,79 @@
 # ASTROVET Model Card
 
-**Model Name:** ASTROVET (Astronomical Vetting & Explainable Triage)  
-**Version:** 0.1.0  
-**Date:** 2026-10-21  
-**Architecture:** Late Fusion of Baseline Scores, Physics Diagnostics, and Unsupervised Light-Curve Representations  
+**Model Name:** ASTROVET TCE Catalog Baseline (E vs B/J)
+**Version:** 0.1.0
+**Date:** 2026-10-28
+**Architecture:** Standardized tabular features, class-weighted logistic regression, and Platt calibration
 
 ---
 
 ## 1. Model Details
 
 - **Developer:** ASTROVET Research & Engineering Team
-- **Baseline Adapter:** The code records an ExoMiner++ release tag/commit and supports catalog lookup and container execution. No upstream checkout or prediction catalog is bundled in this workspace; no live baseline result or upstream preservation claim is made without those files.
-- **Periodicity Verification (BLS & TLS):** Automated transit periodicity screening using Box Least Squares (Astropy BLS; Kovacs et al. 2002) and Transit Least Squares (TLS; Hippke & Heller 2019, `transitleastsquares>=2.0.0`). Detects periodic dips, compares recovered parameters ($P, T_0, \text{duration}$) against candidate ephemerides, flags harmonic/subharmonic relations (0.5x, 2x, 0.333x, 3x), and recovers ephemerides for uncharacterized candidates without inserting demo values.
-- **Physics Diagnostics:** Approximate limb-darkened transit template fitting (for residual baseline estimation), cadence-level and per-event odd-even depth testing with propagated observational uncertainty, secondary eclipse search at phase 0.5, and transit-to-transit consistency.
-- **Representation Branch:** Self-supervised neural encoder with a local pretraining command. A run without a trained checkpoint omits this modality; synthetic-demo checkpoints are rejected for observed-data vetting. Available real-data checkpoints here were smoke-trained on one local TIC/sector and are not scientifically validated representations.
-- **Fusion Layer:** Logistic-regression fitting and Platt calibration primitives exist, but a full labeled training, calibration, held-out evaluation, and deployment workflow is not implemented. Default reported scores are heuristics, not planet probabilities.
+- **Training Dataset:** `D:\Final Year Projet\tces_with_labels_v3.csv` (Astronet-Triage-v2 catalog of 24,926 Threshold-Crossing Events).
+- **Source SHA-256:** `8c4412b073ac3fb02b8b8ee61be32d25d002cd569d4975f848cf8deddcadc1bb`
+- **Trained Artifact:** `ASTROVET_data/artifacts/models/tce_e_vs_bj_classifier.joblib` (local run artifact; separate from the untrained hybrid fusion model).
+- **Target Semantics:** Binary catalog triage, not planet identification:
+  - Positive Class (1): `E`, periodic eclipsing signal (N=2,613). This category includes transiting planets and non-contact eclipsing binaries.
+  - Negative Class (0): `B`, contact eclipsing binary (N=741), or `J`, junk/noise/systematics (N=15,803).
+  - Excluded: `S`, single transit or incorrect period (N=275); `N`, inconclusive (N=154); and missing consensus label (N=5,340).
+- **Partitioning:** 100% Group-Disjoint by Host Star (`TIC ID`) across Train (60%), Validation (15%), Calibration (10%), and Test (15%). Strictly verified zero host star overlap across all partition intersections.
+- **Preprocessing:** `TabularFeaturePreprocessor` fitted strictly on the `train` partition (train medians for continuous features and `StandardScaler`). No test or calibration data was exposed during preprocessing.
+- **Model Tuning:** Regularization parameter $C$ selected strictly on the `validation` partition based on PR-AUC ($C=10.0$).
+- **Probability Calibration:** `PlattCalibrator` (logistic scaling) fitted strictly on the held-out `calibration` partition.
+- **Test Evaluation:** Evaluated once on the untouched `test` partition (2,878 candidates across 2,873 host stars).
 
 ---
 
-## 2. Intended Use
+## 2. Test Set Evaluation Metrics
 
-- **Primary Purpose:** Prioritizing and triaging TESS SPOC transit-like threshold-crossing events (TCEs) for human review and telescope follow-up allocation.
-- **Out of Scope & Non-Goals:**
-  - Claiming exoplanet confirmation or statistical validation.
-  - Automatically re-labeling ambiguous or unreviewed signals as planets.
-  - Operational scheduling without human subject matter expert oversight.
-
----
-
-## 3. Scientific Safeguards & Data Discipline
-
-1. **Host-Grouped Leakage Prevention:** All candidate events for the same stellar host (TIC ID) are grouped into the same partition. Zero cross-sector or multi-planet leakage into test sets.
-2. **Explicit Modality Availability:** Missing data products (e.g. difference images, target pixel files) or missing baseline scores (`NOT_FOUND`) are explicitly tracked in `modality_availability` and NEVER replaced with fabricated zeros or neutral defaults like 0.50.
-3. **Advisory Attribution:** Explanations and reason codes reflect model sensitivity patterns, not physical causal proof.
-4. **Disjoint Calibration:** Probability calibration is fitted exclusively on an independent calibration partition. Unfitted execution paths emit uncalibrated heuristic triage scores, not formal probabilities.
-5. **Baseline Checkpoint Overlap Audit:** Training overlap for public ExoMiner++ checkpoints has not been audited in this project.
+Evaluated on untouched test partition ($N=2,878$, Prevalence = 13.6%):
+- **ROC-AUC:** `0.8901`
+- **PR-AUC:** `0.5368`
+- **Raw Brier Score:** `0.1417` $\rightarrow$ **Calibrated Brier Score:** `0.0825`
+- **Raw Expected Calibration Error (ECE):** `0.2027` $\rightarrow$ **Calibrated ECE:** `0.0222` (order-of-magnitude calibration improvement)
+- **Precision (at threshold 0.50):** `0.6069`
+- **Recall (at threshold 0.50):** `0.4077`
+- **F1 Score:** `0.4877`
+- **Precision@10:** `0.5000` | **Precision@25:** `0.6000` | **Precision@50:** `0.6800`
 
 ---
 
-## 4. Limitations & Scientific Caveats
+## 3. Subgroup Performance & Physical Boundaries
 
-- **Approximate Transit Template:** The transit fit utilizes an empirical parameterized limb-darkened profile for fast screening and residual calculation, not a full numerical Mandel & Agol (2002) orbit integration.
-- **Periodicity Detection vs Validation:** Box Least Squares (BLS) and Transit Least Squares (TLS) detect periodic flux decrements. High SDE or SNR confirms signal recurrence and shape match, but never proves planetary status; astrophysical false positives (eclipsing binaries, blend scenarios) and stellar variability also produce prominent periodogram peaks.
-- **Self-Supervised Representation Scale:** The local encoder has a CPU training loop and checkpoint workflow. The available local smoke checkpoints do not represent full-archive training or scientific validation. Full TESS archive pretraining requires substantially more data and compute.
-- **Containerized Baseline Daemon Dependency:** Live raw-pixel ExoMiner baseline container inference requires an active local Podman or Docker daemon. Where container engines are absent, ASTROVET records `CONTAINER_RUNTIME_UNAVAILABLE` with the exact constructed command rather than falsely claiming live container execution.
-- **Instrument Systematics:** Blended eclipsing binaries and stellar activity (spots, flares) can occasionally mimic planetary transit signatures.
-- **Cadence Scope:** First version is configured for TESS SPOC 2-minute cadence; Full Frame Images (FFI) require dedicated detrending adapters.
+- **Orbital Period:**
+  - Short Period ($P < 3$ days): ROC-AUC = `0.7994`, PR-AUC = `0.5533`
+  - Medium Period ($3 \le P < 15$ days): ROC-AUC = `0.8807`, PR-AUC = `0.5904`
+  - Long Period ($P \ge 15$ days): ROC-AUC = `0.8790`, PR-AUC = `0.1296` (low prevalence, only 15 positives out of 969 candidates)
+- **Transit Depth:**
+  - Shallow ($< 500$ ppm): ROC-AUC = `0.8580`, PR-AUC = `0.1782`
+  - Medium ($500 - 2,500$ ppm): ROC-AUC = `0.8454`, PR-AUC = `0.2151`
+  - Deep ($\ge 2,500$ ppm): ROC-AUC = `0.8465`, PR-AUC = `0.6284`
+- **Host Star Brightness:**
+  - Bright Stars ($T_\text{mag} < 9$): ROC-AUC = `0.9174`, PR-AUC = `0.6227`
+  - Faint Stars ($T_\text{mag} \ge 9$): ROC-AUC = `0.8613`, PR-AUC = `0.5034`
+
+---
+
+## 4. Scientific Safeguards & Data Discipline
+
+1. **Host-Grouped Leakage Prevention:** All candidates for the same stellar host (`TIC ID`) are strictly grouped into the same partition. Zero cross-sector or multi-candidate leakage into test or calibration sets.
+2. **Missing Stellar Values:** Missing stellar mass/radius values are represented by explicit missingness flags; imputation medians and scaling are fit only on training hosts.
+3. **Target / Leakage Column Exclusion:** Identifier columns (`TIC ID`), human labeler annotations (`L1`–`L8`), notes, external split tags (`Split`), and temporal calendar boundaries (`Epoch`, `MinT`, `MaxT`, `Year`) are strictly excluded from predictive features.
+4. **Disjoint Calibration:** E-versus-B/J probability calibration is fitted exclusively on an independent calibration partition. These calibrated values remain probabilities for the catalog label task only.
+5. **Clear Scientific Scope:** The model estimates E versus B/J from catalog summary parameters only. E is not a planet disposition; this artifact is blocked from planet-vetting inference and is not the ASTROVET hybrid fusion model.
+
+The dataset and taxonomy are documented by [Zenodo record 7411579](https://zenodo.org/records/7411579) and [Tey et al. (2023)](https://doi.org/10.3847/1538-3881/acad85). Tey et al. state that Astronet-Triage-v2 does not distinguish eclipsing binaries from transiting planets.
+
+---
+
+## 6. SSL + Physics Fusion Research Head (separate model)
+
+- **Artifact:** `ASTROVET_data/artifacts/models/planet_disposition_prototype/ssl_physics_fusion/astrovet_ssl_physics_fusion_research.joblib`
+- **Target:** CP/KP TOI dispositions versus FP/FA; PC/APC/unset are excluded. This is a selected follow-up cohort, not a representative sample of all TESS targets.
+- **Inputs:** 16-dimensional embedding from the real-data self-supervised encoder plus 11 physics/missingness features from the same feature-vector builder used by FITS upload inference. ExoMiner catalog score is deliberately omitted.
+- **Cohort:** 1,771 real matched light curves from the 1,782-event hard-label cohort; 11 events without a matching downloaded FITS are audited and excluded.
+- **Partitions:** Host-grouped and held out by TIC; after FITS availability filtering: 1,061 train, 270 validation, 177 calibration, 263 test events. Feature scaling is fit on train only; C is chosen on validation; Platt calibration is fit on calibration; test remains untouched.
+- **Test results:** ROC-AUC `0.7768`, PR-AUC `0.8251` at test prevalence `0.5817`; raw Brier `0.1909`, ECE `0.0882`; calibrated Brier `0.1903`, ECE `0.0510`. At calibrated-score threshold 0.5: precision `0.7074`, recall `0.8693`, F1 `0.7801`.
+- **Interpretation:** The calibrated output is a selected-TOI-cohort planet-like score, not a population-wide planet probability, statistical validation, or autonomous disposition. Always retain human review and test broader independent sectors/pipelines before making generalization claims.
+- **Audit:** Feature failures, source/checkpoint hashes, split IDs and full metrics are stored beside the artifact. Rebuild with `scripts/train_ssl_physics_fusion.py`; launch the explicit dashboard path with `scripts/start_dashboard_with_trained_model.ps1`.

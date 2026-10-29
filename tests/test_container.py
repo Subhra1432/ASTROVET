@@ -1,4 +1,3 @@
-import json
 import unittest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
@@ -24,11 +23,13 @@ class TestExoMinerContainer(unittest.TestCase):
             duration_hours=1.008,
         )
         self.assertEqual(cmd[0], "podman")
-        self.assertIn("ghcr.io/nasa/exominer:v1.0.0", cmd)
-        self.assertIn("--tic", cmd)
-        self.assertIn("390651552", cmd)
-        self.assertIn("--period", cmd)
-        self.assertIn("1.467", cmd)
+        self.assertTrue(any(arg.startswith("ghcr.io/nasa/exominer@sha256:") for arg in cmd))
+        self.assertIn("--tic_ids", cmd)
+        self.assertIn("390651552_23", cmd)
+        self.assertIn("--task=phot-vetting", cmd)
+        self.assertIn("--exominer_model=single", cmd)
+        self.assertIn("--output_dir=/workspace/output", cmd)
+        self.assertNotIn("--period", cmd)  # the official runner obtains ephemerides from SPOC DV
 
     def test_engine_missing_structured_status(self):
         """Verify clear unavailable status and instructions when no daemon exists."""
@@ -52,15 +53,11 @@ class TestExoMinerContainer(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             out_dir = Path(tmp_dir) / "output"
             out_dir.mkdir(parents=True, exist_ok=True)
-            with open(out_dir / "prediction.json", "w", encoding="utf-8") as f:
-                json.dump({
-                    "candidate_id": "390651552-1-S23",
-                    "score": 0.892,
-                    "score_pc": 0.892,
-                    "score_afp": 0.051,
-                    "score_ntp": 0.057,
-                    "score_uncertainty": 0.018,
-                }, f)
+            (out_dir / "predictions_output.csv").write_text(
+                "uid,score_PC,score_std_PC,score_AFP,score_NTP,prediction\n"
+                "390651552-1-S23,0.892,0.018,0.051,0.057,PC\n",
+                encoding="utf-8",
+            )
 
             mock_res = MagicMock()
             mock_res.returncode = 0

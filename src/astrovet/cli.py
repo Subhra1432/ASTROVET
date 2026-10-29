@@ -35,6 +35,7 @@ from astrovet.baseline.adapter import (
     EXOMINER_RELEASE_TAG,
     EXOMINER_RELEASE_COMMIT,
     EXOMINER_MODEL_NAME,
+    find_default_catalog_path,
 )
 from astrovet.ssl.encoder import LightCurvePCAPrototypeEncoder
 from astrovet.models.fusion import AstrovetFusionModel
@@ -92,10 +93,16 @@ def doctor_cmd() -> None:
     
     project_root = Path(__file__).resolve().parents[2]
     upstream_dir = project_root.parent / "ExoMiner-main"
+    catalog_path = find_default_catalog_path(project_root)
+    if catalog_path:
+        click.echo(f"  [FOUND] ExoMiner++ prediction catalog: {catalog_path.resolve()}")
+    else:
+        click.echo("  [UNAVAILABLE] Prediction catalog not found; supply --catalog for reference scores.")
     if upstream_dir.is_dir() and (upstream_dir / "exominer_pipeline").is_dir():
         click.echo(f"  [FOUND] Upstream ExoMiner checkout: {upstream_dir.resolve()}")
+        click.echo("  [NOTE] Live container execution also requires an available Docker/Podman daemon.")
     else:
-        click.echo("  [UNAVAILABLE] Upstream checkout not found; live/reference scores require a separately supplied catalog or checkout.")
+        click.echo("  [INFO] No upstream source checkout; catalog mode remains available when a catalog is present.")
 
     click.echo("=" * 60)
     if all_ok:
@@ -192,6 +199,52 @@ def data_fetch_cmd(
     click.echo(f"  Cadence Seconds  : {res.get('cadence_seconds', 120.0):.1f}s")
     click.echo(f"  Retrieval Mode   : {res.get('retrieval_mode', 'N/A')}")
     click.echo(f"  Manifest Saved   : {manifest}")
+
+
+
+
+@data_group.command("validate-fits")
+@click.option("--fits-file", required=True, type=click.Path(exists=True), help="Path to TESS SPOC or QLP FITS light curve.")
+@click.option("--output", "output_path", default=None, type=click.Path(), help="Optional JSON path to save audit.")
+def data_validate_fits_cmd(fits_file: str, output_path: Optional[str]) -> None:
+    """Validate a TESS FITS light curve, check finite cadences, and report quality attrition audit."""
+    from astrovet.lightcurves.validator import audit_lightcurve_fits
+    click.echo(f"Validating FITS light curve: {fits_file}")
+    try:
+        rep = audit_lightcurve_fits(fits_file)
+    except Exception as e:
+        raise click.ClickException(f"Validation failed: {e}")
+
+    click.secho("\nFITS Light Curve Audit Summary:", fg="green", bold=True)
+    click.echo(f"  File Name      : {rep['file_name']}")
+    click.echo(f"  File Size      : {rep['file_size_bytes']:,} bytes")
+    click.echo(f"  SHA-256        : {rep['sha256']}")
+    click.echo(f"  Pipeline Origin: {rep['pipeline_origin']}")
+    meta = rep["metadata"]
+    click.echo(f"  Target TIC ID  : {meta.get('tic_id')}")
+    click.echo(f"  Observing Sector: {meta.get('sector')}")
+    click.echo(f"  Median Cadence : {meta.get('cadence_seconds')}s")
+
+    ca = rep["cadence_audit"]
+    click.secho("\n--- Cadence Attrition & Quality Filtering ---", bold=True)
+    click.echo(f"  Raw Total Cadences : {ca['raw_total_cadences']:,}")
+    click.echo(f"  Finite & Positive  : {ca['finite_positive_cadences']:,}")
+    click.echo(f"  Non-Finite Rejected: {ca['non_finite_rejected']:,}")
+    click.echo(f"  Bitmask Filtered   : {ca['quality_bitmask_retained']:,} retained ({ca['retention_percentage']}%)")
+    click.echo(f"  Usable Cadences    : {ca['usable_cadences']:,}")
+    click.echo(f"  Observing Segments : {len(rep['segments'])}")
+
+    if rep.get("warnings"):
+        click.secho("\nWarnings:", fg="yellow", bold=True)
+        for w in rep["warnings"]:
+            click.echo(f"  - {w}")
+
+    if output_path:
+        out_p = Path(output_path)
+        out_p.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_p, "w", encoding="utf-8") as f:
+            json.dump(rep, f, indent=2)
+        click.echo(f"\nAudit saved to: {out_p.resolve()}")
 
 
 @cli.group("baseline")
@@ -296,6 +349,12 @@ def baseline_run_cmd(catalog: Optional[str], candidate_ids: tuple, synthetic: bo
     default=False,
     help="Explicit opt-in to allow synthetic demo fixture when real FITS is missing."
 )
+@click.option(
+    "--model-artifact",
+    default=None,
+    type=click.Path(),
+    help="Optional path to a compatible fitted fusion-model bundle (.joblib); catalog E-vs-B/J artifacts are not planet-vetting models."
+)
 def explain_cmd(
     candidate_id: str,
     fits_file: Optional[str],
@@ -313,6 +372,7 @@ def explain_cmd(
     min_period: float,
     max_period: Optional[float],
     allow_synthetic: bool,
+    model_artifact: Optional[str] = None,
 ) -> None:
     """Run full ASTROVET vetting slice with BLS/TLS verification and generate evidence report."""
     from astrovet.explain.report import vet_and_generate_report
@@ -345,6 +405,7 @@ def explain_cmd(
             encoder_mode=encoder_mode,
             ssl_checkpoint=ssl_checkpoint,
             allow_synthetic=allow_synthetic,
+            model_artifact=model_artifact,
         )
     except FileNotFoundError as fnf_err:
         raise click.ClickException(f"{fnf_err}")
@@ -519,6 +580,9 @@ def ssl_group() -> None:
 @ssl_group.command("pretrain")
 @click.option("--input-fits", default=None, type=str, help="Path to single real unlabeled TESS FITS light curve.")
 @click.option("--input-fits-dir", default=None, type=str, help="Directory containing real unlabeled TESS FITS files.")
+@click.option("--train-host-split-manifest", default=None, type=click.Path(exists=True), help="Host-grouped model-training manifest; when supplied, only train-partition TICs are used for SSL.")
+@click.option("--max-input-files", default=None, type=click.IntRange(min=1), help="Optional deterministic sample cap for a FITS directory (applied after training-host filtering).")
+@click.option("--input-sample-seed", default=42, type=int, help="Seed used when --max-input-files samples a FITS directory.")
 @click.option("--prepared-views", default=None, type=str, help="Path to pre-extracted .npz views file.")
 @click.option("--synthetic-demo", is_flag=True, default=False, help="Explicit opt-in to generate synthetic transit curves for demo/testing only.")
 @click.option("--epochs", default=5, type=int, help="Pretraining epochs.")
@@ -529,6 +593,9 @@ def ssl_group() -> None:
 def ssl_pretrain_cmd(
     input_fits: Optional[str],
     input_fits_dir: Optional[str],
+    train_host_split_manifest: Optional[str],
+    max_input_files: Optional[int],
+    input_sample_seed: int,
     prepared_views: Optional[str],
     synthetic_demo: bool,
     epochs: int,
@@ -550,6 +617,19 @@ def ssl_pretrain_cmd(
             "Please provide real TESS light curves using --input-fits, --input-fits-dir, or --prepared-views. "
             "To run a synthetic CPU verification test instead, pass --synthetic-demo explicitly."
         )
+
+    allowed_tic_ids = None
+    split_manifest_sha256 = None
+    if train_host_split_manifest:
+        if not input_fits_dir:
+            raise click.UsageError("--train-host-split-manifest requires --input-fits-dir so only the training-host light curves can be selected.")
+        split_path = Path(train_host_split_manifest)
+        with open(split_path, "r", encoding="utf-8") as f:
+            split_doc = json.load(f)
+        allowed_tic_ids = set(split_doc.get("metadata", {}).get("host_ids_by_split", {}).get("train", []))
+        if not allowed_tic_ids:
+            raise click.ClickException("The split manifest contains no metadata.host_ids_by_split.train IDs.")
+        split_manifest_sha256 = compute_sha256(split_path)
 
     provenance: Dict[str, Any] = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -595,14 +675,34 @@ def ssl_pretrain_cmd(
         )
     elif input_fits_dir:
         click.echo(f"Scanning directory for real TESS FITS curves: {input_fits_dir}")
-        views_arr, meta_list = extract_views_from_directory(input_fits_dir)
+        views_arr, meta_list = extract_views_from_directory(
+            input_fits_dir,
+            max_files=max_input_files,
+            allowed_tic_ids=allowed_tic_ids,
+            sample_seed=input_sample_seed,
+        )
         provenance["data_source"] = "REAL_TESS_FITS"
         provenance["input_mode"] = "directory"
         provenance["input_dir"] = str(Path(input_fits_dir).resolve())
-        provenance["input_files"] = [m["file_path"] for m in meta_list]
+        used_meta = [m for m in meta_list if m.get("views_extracted", 0) > 0]
+        skipped_meta = [m for m in meta_list if m.get("skipped")]
+        provenance["input_files"] = [m["file_path"] for m in used_meta]
         provenance["files_metadata"] = meta_list
         provenance["num_views"] = len(views_arr)
-        click.echo(f"  Extracted {len(views_arr)} total real views across {len(meta_list)} FITS files.")
+        provenance["num_light_curve_files_used"] = len(used_meta)
+        provenance["num_light_curve_files_skipped"] = len(skipped_meta)
+        provenance["skipped_file_audit"] = skipped_meta
+        provenance["max_input_files"] = max_input_files
+        provenance["input_sample_seed"] = input_sample_seed
+        if train_host_split_manifest:
+            provenance["training_host_split_manifest"] = str(Path(train_host_split_manifest).resolve())
+            provenance["training_host_split_manifest_sha256"] = split_manifest_sha256
+            provenance["training_host_tic_count_in_manifest"] = len(allowed_tic_ids)
+            provenance["ssl_partition_policy"] = "train hosts only; validation/calibration/test host curves excluded"
+        click.echo(
+            f"  Extracted {len(views_arr)} real views from {len(used_meta)} FITS files; "
+            f"skipped {len(skipped_meta)} files (reasons are recorded in checkpoint provenance)."
+        )
     elif prepared_views:
         click.echo(f"Loading prepared training views from: {prepared_views}")
         views_arr, meta = load_prepared_views(prepared_views)
@@ -643,6 +743,104 @@ def ui_cmd(host: str, port: int) -> None:
     """Start local interactive ASTROVET vetting dashboard server."""
     from astrovet.ui.server import run_dashboard_server
     run_dashboard_server(host=host, port=port)
+
+
+
+
+@cli.group("model")
+def model_group() -> None:
+    """Model training, probability calibration, and evaluation commands."""
+    pass
+
+
+@model_group.command("train")
+@click.option("--data", "data_path", required=True, type=click.Path(exists=True), help="Path to TCE catalog CSV (e.g. tces_with_labels_v3.csv).")
+@click.option("--artifacts-dir", default="artifacts", type=click.Path(), help="Directory to save models, manifests, and reports.")
+@click.option("--seed", default=42, type=int, help="Random seed for host-grouped splitting.")
+def model_train_cmd(data_path: str, artifacts_dir: str, seed: int) -> None:
+    """Train the tabular TCE E-versus-B/J baseline with leakage-safe splits and calibration."""
+    from astrovet.models.training import run_training_pipeline
+
+    click.secho("=== ASTROVET Model Training Workflow ===", bold=True)
+    click.echo(f"  Dataset Path  : {data_path}")
+    click.echo(f"  Artifacts Dir : {artifacts_dir}")
+    click.echo(f"  Random Seed   : {seed}")
+
+    try:
+        res = run_training_pipeline(
+            dataset_path=data_path,
+            artifacts_dir=artifacts_dir,
+            random_seed=seed,
+        )
+    except Exception as e:
+        raise click.ClickException(f"Training failed: {e}")
+
+    click.secho("\n[SUCCESS] Model Training & Evaluation Completed!", fg="green", bold=True)
+    audit = res["dataset_audit"]["valid_labeled_cohort"]
+    click.echo(f"  Valid Labeled Candidates : {audit['total_candidates']:,} across {audit['unique_host_stars']:,} unique host stars")
+    click.echo(f"  Positive (E: eclipsing signal): {audit['positive_count']:,} ({audit['positive_prevalence']:.1%})")
+    click.echo(f"  Negative (B/J: contact binary or junk): {audit['negative_count']:,}")
+
+    cal = res["test_evaluation"]
+    click.secho("\n--- Untouched Test Partition Metrics ---", bold=True)
+    click.echo(f"  ROC-AUC         : {cal['ranking']['roc_auc']:.4f}")
+    click.echo(f"  PR-AUC          : {cal['ranking']['pr_auc']:.4f}")
+    click.echo(f"  Raw Brier Score : {cal['calibration']['raw_brier_score']:.4f}")
+    click.echo(f"  Calibrated Brier: {cal['calibration']['calibrated_brier_score']:.4f}")
+    click.echo(f"  Raw ECE         : {cal['calibration']['raw_ece']:.4f}")
+    click.echo(f"  Calibrated ECE  : {cal['calibration']['calibrated_ece']:.4f}")
+    cls_rep = cal.get("classification_at_p05", {})
+    click.echo(f"  Precision (p>=0.5): {cls_rep.get('precision', 'N/A')}")
+    click.echo(f"  Recall (p>=0.5)   : {cls_rep.get('recall', 'N/A')}")
+    click.echo(f"  F1 Score (p>=0.5) : {cls_rep.get('f1_score', 'N/A')}")
+
+    click.echo(f"\n  Model Artifact Saved  : {res['model_artifact']}")
+    click.echo(f"  Split Manifest Saved  : {res['split_manifest_file']}")
+
+
+@cli.command("train")
+@click.option("--data", "data_path", required=True, type=click.Path(exists=True), help="Path to TCE catalog CSV (e.g. tces_with_labels_v3.csv).")
+@click.option("--artifacts-dir", default="artifacts", type=click.Path(), help="Directory to save models, manifests, and reports.")
+@click.option("--seed", default=42, type=int, help="Random seed for host-grouped splitting.")
+def root_train_cmd(data_path: str, artifacts_dir: str, seed: int) -> None:
+    """Train the tabular TCE E-versus-B/J baseline with leakage-safe splits and calibration."""
+    from astrovet.models.training import run_training_pipeline
+
+    click.secho("=== ASTROVET Model Training Workflow ===", bold=True)
+    click.echo(f"  Dataset Path  : {data_path}")
+    click.echo(f"  Artifacts Dir : {artifacts_dir}")
+    click.echo(f"  Random Seed   : {seed}")
+
+    try:
+        res = run_training_pipeline(
+            dataset_path=data_path,
+            artifacts_dir=artifacts_dir,
+            random_seed=seed,
+        )
+    except Exception as e:
+        raise click.ClickException(f"Training failed: {e}")
+
+    click.secho("\n[SUCCESS] Model Training & Evaluation Completed!", fg="green", bold=True)
+    audit = res["dataset_audit"]["valid_labeled_cohort"]
+    click.echo(f"  Valid Labeled Candidates : {audit['total_candidates']:,} across {audit['unique_host_stars']:,} unique host stars")
+    click.echo(f"  Positive (E: eclipsing signal): {audit['positive_count']:,} ({audit['positive_prevalence']:.1%})")
+    click.echo(f"  Negative (B/J: contact binary or junk): {audit['negative_count']:,}")
+
+    cal = res["test_evaluation"]
+    click.secho("\n--- Untouched Test Partition Metrics ---", bold=True)
+    click.echo(f"  ROC-AUC         : {cal['ranking']['roc_auc']:.4f}")
+    click.echo(f"  PR-AUC          : {cal['ranking']['pr_auc']:.4f}")
+    click.echo(f"  Raw Brier Score : {cal['calibration']['raw_brier_score']:.4f}")
+    click.echo(f"  Calibrated Brier: {cal['calibration']['calibrated_brier_score']:.4f}")
+    click.echo(f"  Raw ECE         : {cal['calibration']['raw_ece']:.4f}")
+    click.echo(f"  Calibrated ECE  : {cal['calibration']['calibrated_ece']:.4f}")
+    cls_rep = cal.get("classification_at_p05", {})
+    click.echo(f"  Precision (p>=0.5): {cls_rep.get('precision', 'N/A')}")
+    click.echo(f"  Recall (p>=0.5)   : {cls_rep.get('recall', 'N/A')}")
+    click.echo(f"  F1 Score (p>=0.5) : {cls_rep.get('f1_score', 'N/A')}")
+
+    click.echo(f"\n  Model Artifact Saved  : {res['model_artifact']}")
+    click.echo(f"  Split Manifest Saved  : {res['split_manifest_file']}")
 
 
 def main() -> None:

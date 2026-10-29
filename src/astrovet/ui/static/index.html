@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ASTROVET ? Transit Candidate Vetting Dashboard</title>
+  <title>ASTROVET — Transit Candidate Vetting Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -97,21 +97,9 @@
       gap: 10px;
     }
 
-    .synthetic-tag {
-      background: #ef4444;
-      color: #fff;
-      font-weight: 700;
-      font-size: 10px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-
     .layout-grid {
       display: grid;
-      grid-template-columns: 360px 1fr;
+      grid-template-columns: 380px 1fr;
       gap: 24px;
     }
 
@@ -166,6 +154,21 @@
 
     input:focus, select:focus {
       border-color: var(--border-focus);
+    }
+
+    .upload-zone {
+      border: 2px dashed var(--border);
+      background: rgba(26, 35, 56, 0.4);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent-blue);
+      background: rgba(56, 189, 248, 0.08);
     }
 
     button.btn-primary {
@@ -296,6 +299,24 @@
       border: 1px solid rgba(255, 255, 255, 0.1);
       color: var(--text-muted);
     }
+
+    .audit-card {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid #334155;
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-size: 12px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 11px;
+    }
+    .pill-spoc { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #0284c7; }
+    .pill-qlp { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #7e22ce; }
   </style>
 </head>
 <body>
@@ -319,29 +340,52 @@
     <div class="layout-grid">
       <!-- Controls Column -->
       <aside class="card">
-        <div class="card-title">Real Candidate Query</div>
+        <div class="card-title">
+          <span>Input & Light Curve Selection</span>
+        </div>
+
+        <!-- 1. Safe Upload Section -->
         <div class="form-group">
-          <label for="candidateIdInput">Candidate Compound ID *</label>
-          <input type="text" id="candidateIdInput" value="" placeholder="e.g. 390651552-1-S23">
-          <span style="font-size:11px; color:var(--text-muted);">Format: TIC-Planet-Sector (e.g. 390651552-1-S23)</span>
+          <label>Upload TESS Light Curve (.fits / .fits.gz)</label>
+          <div class="upload-zone" id="dropZone" onclick="document.getElementById('fitsFileInput').click()">
+            <input type="file" id="fitsFileInput" accept=".fits,.fits.gz" style="display:none" onchange="handleFileSelected(this.files)">
+            <div id="uploadPrompt">
+              <svg style="width:28px; height:28px; margin:0 auto 8px; stroke:var(--accent-blue); fill:none;" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <div style="font-size:13px; font-weight:600; color:var(--text-main);">Click or Drag & Drop FITS File</div>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Supports TESS SPOC and QLP formats (Max 50MB)</div>
+            </div>
+            <div id="uploadSelected" style="display:none; font-family:var(--font-mono); font-size:12px; color:var(--accent-blue); word-break:break-all;"></div>
+          </div>
+        </div>
+
+        <!-- 2. Candidate ID & Server Path Option -->
+        <div class="form-group">
+          <label for="candidateIdInput">Candidate Compound ID (Optional if uploading FITS)</label>
+          <input type="text" id="candidateIdInput" value="" placeholder="e.g. 390651552-1-S23 (auto-derived if uploaded)">
+          <span style="font-size:11px; color:var(--text-muted);">Format: TIC-Planet-Sector</span>
         </div>
 
         <div class="form-group">
-          <label for="fitsPathInput">Observed FITS File Path</label>
-          <input type="text" id="fitsPathInput" value="" placeholder="Path to local FITS (or leave empty if in data/raw/mast)">
+          <label for="fitsPathInput">Or Local Cached FITS Path</label>
+          <input type="text" id="fitsPathInput" value="" placeholder="Path in data/raw/mast (or use upload above)">
         </div>
 
-        <div class="form-group" style="margin-bottom:16px;">
+        <div class="form-group" style="margin-bottom:8px;">
           <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; color:var(--accent-blue);">
             <input type="checkbox" id="retrieveMastCheck">
-            <span>Download official SPOC light curve from MAST if not cached locally</span>
+            <span>Download official SPOC light curve from MAST if not cached</span>
           </label>
         </div>
 
+        <!-- 3. Ephemeris Overrides -->
         <div style="border-top:1px solid var(--border); padding-top:12px; margin-bottom:12px;">
           <span style="font-size:12px; font-weight:600; color:var(--text-muted);">Ephemeris Constraints (Optional)</span>
           <p style="font-size:11px; color:#64748b; margin-top:2px; margin-bottom:8px;">
-            If left blank, BLS and TLS will run an automated blind search and recover orbital parameters directly from the data.
+            If blank, BLS and TLS automatically recover orbital parameters directly from the data.
           </p>
 
           <div class="form-group">
@@ -360,7 +404,7 @@
           </div>
         </div>
 
-        <button class="btn-primary" id="vetBtn" onclick="runVetting()">
+        <button class="btn-primary" id="vetBtn" onclick="runPipelineAction()">
           <span>Execute Vetting & Evidence Generation</span>
         </button>
       </aside>
@@ -370,6 +414,26 @@
         <div class="card-title">
           <span>Vetting Decision & Diagnostics</span>
           <span id="triageBadge" class="triage-badge badge-not-run">NOT RUN</span>
+        </div>
+
+        <!-- Upload Audit Banner (Shown when a file is uploaded) -->
+        <div id="uploadAuditPanel" class="audit-card" style="display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="font-weight:700; font-size:13px; color:#fff; display:flex; align-items:center; gap:8px;">
+              <span>FITS Ingestion & Preprocessing Audit</span>
+              <span id="auditPipelinePill" class="pill pill-spoc">SPOC</span>
+            </div>
+            <span id="auditFileSize" class="font-mono" style="color:var(--text-muted);">--</span>
+          </div>
+
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:8px; margin-bottom:8px;">
+            <div><strong>SHA-256:</strong> <span id="auditSha256" class="font-mono" style="word-break:break-all; font-size:11px;">--</span></div>
+            <div><strong>Target / Sector:</strong> <span id="auditTargetSector">--</span></div>
+            <div><strong>Cadence Retention:</strong> <span id="auditCadenceRetention">--</span></div>
+            <div><strong>Segments:</strong> <span id="auditSegmentsCount">--</span></div>
+          </div>
+
+          <div id="auditWarnings" style="color:#fca5a5; margin-top:4px; font-size:11px;"></div>
         </div>
 
         <div class="score-grid">
@@ -388,7 +452,7 @@
           </div>
 
           <div class="metric-box">
-            <span class="metric-label">Calibrated Probability</span>
+            <span class="metric-label">Calibrated Score</span>
             <span class="metric-value" id="valCalibratedProb">N/A</span>
             <span class="sub-tag" id="valCalibratedMode">[NOT_RUN]</span>
             <span class="metric-note" id="noteCalibrated">Awaiting candidate vetting run</span>
@@ -400,6 +464,13 @@
             <span class="sub-tag" id="valUncertaintyMode">[NOT_RUN]</span>
             <span class="metric-note" id="noteUncertainty">Awaiting candidate vetting run</span>
           </div>
+        </div>
+
+        <div class="audit-card" style="margin: 10px 0;">
+          <div style="font-size:12px; font-weight:700; margin-bottom:5px;">Model Inputs & Score Explanation</div>
+          <div style="font-size:12px; color:var(--text-muted);">SSL representation: <strong id="sslStatus">Not run</strong>. This encoder learns light-curve representations; it is not, by itself, a planet classifier.</div>
+          <pre id="scoreExplanation" style="white-space:pre-wrap; font-family:inherit; font-size:12px; line-height:1.5; color:var(--text-main); margin:6px 0 0;">Explanation appears after a real-data vetting run.</pre>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Model explanations describe score mechanics/associations, not causal proof.</div>
         </div>
 
         <div>
@@ -484,7 +555,7 @@
             </tbody>
           </table>
           <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-            * BLS uses a standard box template; TLS uses realistic limb-darkened profiles. Detection confirms periodic recurrence, NEVER exoplanetary validation.
+            * BLS uses a box profile; TLS uses limb-darkened profiles. Detection confirms signal periodicity, NEVER planet confirmation.
           </p>
         </div>
 
@@ -492,38 +563,120 @@
           <h3 style="font-size: 14px; margin-bottom: 8px;">Diagnostic Light Curve View</h3>
           <div class="plot-container" id="plotContainer">
             <div id="plotPlaceholder" style="color:var(--text-muted); font-size:13px; padding:32px 16px;">
-              No diagnostic plot loaded. Enter a Candidate Compound ID and click Execute to generate diagnostic phase-folded light curve views.
+              No diagnostic plot loaded. Upload a FITS file or enter a Candidate ID to generate phase-folded light curve views.
             </div>
             <img id="diagnosticPlot" src="" alt="Transit Diagnostics" style="display:none; max-width:100%; height:auto; border-radius:var(--radius-sm);" onerror="this.style.display='none'; document.getElementById('plotPlaceholder').style.display='block'; document.getElementById('plotPlaceholder').innerText='Diagnostic plot not available for this candidate.';">
           </div>
         </div>
 
         <div style="font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 12px;">
-          <strong>Attribution & Provenance Notice:</strong> ASTROVET prioritizes candidates for human review. Diagnostic attributions reflect model sensitivity patterns, not causal physical proof.
+          <strong>Scientific Notice:</strong> ASTROVET is a triage aid for human review. High scores reflect candidate plausibility, NOT physical planet validation. The tabular catalog baseline artifact models periodic transit signals (E) vs contact binaries (B) or noise (J); it does not validate planets.
         </div>
       </main>
     </div>
   </div>
 
   <script>
-    async function runVetting() {
+    let selectedFile = null;
+
+    // Drag and drop handlers
+    const dropZone = document.getElementById('dropZone');
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      }, false);
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+      }, false);
+    });
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length > 0) {
+        handleFileSelected(files);
+      }
+    });
+
+    function handleFileSelected(files) {
+      if (!files || files.length === 0) return;
+      selectedFile = files[0];
+      const promptEl = document.getElementById('uploadPrompt');
+      const selEl = document.getElementById('uploadSelected');
+      promptEl.style.display = 'none';
+      selEl.style.display = 'block';
+      selEl.innerText = `Selected: ${selectedFile.name} (${(selectedFile.size / (1024*1024)).toFixed(2)} MB)`;
+    }
+
+    async function runPipelineAction() {
+      if (selectedFile) {
+        await uploadAndVetFile();
+      } else {
+        await runVettingQuery();
+      }
+    }
+
+    async function uploadAndVetFile() {
       const btn = document.getElementById('vetBtn');
       const errBox = document.getElementById('errorAlert');
-      const statusBanner = document.getElementById('statusBanner');
-      
       errBox.style.display = 'none';
-      errBox.textContent = '';
-      btn.innerText = 'Vetting in progress...';
+      btn.innerText = 'Uploading & Vetting...';
       btn.disabled = true;
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const candidateId = document.getElementById('candidateIdInput').value.trim();
+      if (candidateId) formData.append('candidate_id', candidateId);
+
+      const period = document.getElementById('period').value.trim();
+      if (period) formData.append('period', period);
+      const epoch = document.getElementById('epoch').value.trim();
+      if (epoch) formData.append('epoch', epoch);
+      const duration = document.getElementById('duration').value.trim();
+      if (duration) formData.append('duration', duration);
+
+      try {
+        const resp = await fetch('/api/upload_and_vet', {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await resp.json().catch(() => null);
+
+        if (!resp.ok) {
+          const msg = data && data.error ? data.error : `HTTP ${resp.status} ${resp.statusText}`;
+          errBox.textContent = `Upload / Vetting Error: ${msg}`;
+          errBox.style.display = 'block';
+          return;
+        }
+
+        renderVettingResults(data);
+      } catch (err) {
+        errBox.textContent = `Network Error during upload: ${err.message}`;
+        errBox.style.display = 'block';
+      } finally {
+        btn.innerText = 'Execute Vetting & Evidence Generation';
+        btn.disabled = false;
+      }
+    }
+
+    async function runVettingQuery() {
+      const btn = document.getElementById('vetBtn');
+      const errBox = document.getElementById('errorAlert');
+      errBox.style.display = 'none';
 
       const candidateId = document.getElementById('candidateIdInput').value.trim();
       if (!candidateId) {
-        errBox.textContent = 'Validation Error: Candidate Compound ID is required (e.g. 390651552-1-S23).';
+        errBox.textContent = 'Validation Error: Please select a FITS file to upload, or enter a Candidate Compound ID.';
         errBox.style.display = 'block';
-        btn.innerText = 'Execute Vetting & Evidence Generation';
-        btn.disabled = false;
         return;
       }
+
+      btn.innerText = 'Vetting in progress...';
+      btn.disabled = true;
 
       const fitsFile = document.getElementById('fitsPathInput').value.trim();
       const retrieveMast = document.getElementById('retrieveMastCheck').checked;
@@ -550,132 +703,167 @@
           return;
         }
 
-        // Render status banner
-        if (data.is_synthetic) {
-          statusBanner.className = 'synthetic-banner';
-          statusBanner.removeAttribute('style');
-          statusBanner.textContent = 'DEMO / SYNTHETIC FIXTURE — Evaluated using synthetic test data. Not a real flight prediction.';
-          statusBanner.style.display = 'flex';
-        } else {
-          statusBanner.className = 'synthetic-banner';
-          statusBanner.style.background = 'rgba(16, 185, 129, 0.12)';
-          statusBanner.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-          statusBanner.style.color = '#a7f3d0';
-          statusBanner.textContent = `REAL OBSERVED DATA — Evaluated from official TESS SPOC observation (${data.fits_file_used || 'data/raw/mast'}).`;
-          statusBanner.style.display = 'flex';
-        }
-
-        document.getElementById('valBaselineScore').innerText = data.baseline_score !== null ? data.baseline_score.toFixed(4) : 'N/A';
-        document.getElementById('valBaselineMode').innerText = `[${data.baseline_execution_mode || 'BASELINE_UNAVAILABLE'}]`;
-        document.getElementById('noteBaseline').innerText = data.baseline_score !== null ? 'ExoMiner baseline model score' : 'Baseline unavailable in catalog / container daemon absent';
-
-        document.getElementById('valAstrovetScore').innerText = data.astrovet_raw_score !== null ? data.astrovet_raw_score.toFixed(4) : 'N/A';
-        document.getElementById('valAstrovetMode').innerText = `[${data.score_type ? data.score_type.toUpperCase() : 'HEURISTIC'}]`;
-        document.getElementById('noteAstrovet').innerText = data.score_type === 'fitted_fusion_score' ? 'Fitted fusion ranking score (not a probability)' : 'Heuristic triage score (uncalibrated)';
-
-        document.getElementById('valCalibratedProb').innerText = data.calibrated_planet_like_probability !== null ? data.calibrated_planet_like_probability.toFixed(4) : 'N/A';
-        document.getElementById('valCalibratedMode').innerText = data.is_calibrated ? '[CALIBRATED]' : '[NOT_CALIBRATED]';
-        document.getElementById('noteCalibrated').innerText = data.is_calibrated ? 'Fitted Platt calibrator probability' : 'No fitted calibrator supplied';
-
-        document.getElementById('valUncertainty').innerText = data.predictive_uncertainty !== null ? `±${data.predictive_uncertainty.toFixed(3)}` : 'N/A';
-        document.getElementById('valUncertaintyMode').innerText = (data.predictive_uncertainty !== null && data.predictive_uncertainty < 0.3) ? '[LOW_UNCERTAINTY]' : '[HIGH_UNCERTAINTY]';
-        document.getElementById('noteUncertainty').innerText = (data.predictive_uncertainty !== null && data.predictive_uncertainty < 0.3) ? 'Within confidence margin' : 'Human review required for final triage';
-
-        const badge = document.getElementById('triageBadge');
-        badge.innerText = data.class_or_triage_state.replace('_', ' ');
-        if (data.class_or_triage_state === 'PLANET_LIKE') {
-          badge.className = 'triage-badge badge-candidate';
-        } else if (data.class_or_triage_state === 'FALSE_POSITIVE_LIKE') {
-          badge.className = 'triage-badge badge-false-positive';
-        } else {
-          badge.className = 'triage-badge badge-review';
-        }
-
-        // Render physics table
-        const diag = data.diagnostics || {};
-        const pBody = document.getElementById('physicsTableBody');
-        pBody.innerHTML = `
-          <tr>
-            <td>Transit Template Depth</td>
-            <td class="font-mono">${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? diag.transit_depth_fitted_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
-            <td><span style="color:${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? '#10b981' : '#94a3b8'};">${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? 'Available' : 'N/A'}</span></td>
-            <td>Limb-darkened template fit</td>
-          </tr>
-          <tr>
-            <td>Transit Duration</td>
-            <td class="font-mono">${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? diag.transit_duration_fitted_hours.toFixed(3) + ' hours' : 'N/A'}</td>
-            <td><span style="color:${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? '#10b981' : '#94a3b8'};">${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? 'Available' : 'N/A'}</span></td>
-            <td>Contact I-IV estimate</td>
-          </tr>
-          <tr>
-            <td>Reduced &chi;<sup>2</sup></td>
-            <td class="font-mono">${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? diag.fit_chi2_reduced.toFixed(3) : 'N/A'}</td>
-            <td><span style="color:${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? '#10b981' : '#94a3b8'};">${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? 'Available' : 'N/A'}</span></td>
-            <td>Residual template goodness-of-fit</td>
-          </tr>
-          <tr>
-            <td>Odd vs. Even Consistency</td>
-            <td class="font-mono">${diag.odd_even_depth_diff_ppm !== null && diag.odd_even_depth_diff_ppm !== undefined ? '&Delta; = ' + diag.odd_even_depth_diff_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
-            <td><span style="color:${diag.odd_even_consistent ? '#10b981' : (diag.odd_even_consistent === false ? '#ef4444' : '#94a3b8')};">${diag.odd_even_consistent === true ? 'Consistent' : (diag.odd_even_consistent === false ? 'Discrepant' : 'N/A')}</span></td>
-            <td>Odd/even consistency screen; not an exclusion test</td>
-          </tr>
-          <tr>
-            <td>Secondary Eclipse</td>
-            <td class="font-mono">${diag.secondary_depth_ppm !== null && diag.secondary_depth_ppm !== undefined ? 'Depth = ' + diag.secondary_depth_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
-            <td><span style="color:${diag.secondary_eclipse_detected ? '#ef4444' : (diag.secondary_eclipse_detected === false ? '#10b981' : '#94a3b8')};">${diag.secondary_eclipse_detected ? 'Detected (EB risk)' : (diag.secondary_eclipse_detected === false ? 'Not detected' : 'N/A')}</span></td>
-            <td>Phase 0.5 occultation search</td>
-          </tr>
-        `;
-
-        if (data.plot_url) {
-          const plotImg = document.getElementById('diagnosticPlot');
-          const plotPlaceholder = document.getElementById('plotPlaceholder');
-          plotImg.src = `${data.plot_url}?t=${new Date().getTime()}`;
-          plotImg.style.display = 'block';
-          plotPlaceholder.style.display = 'none';
-        }
-
-        if (data.periodogram) {
-          const bls = data.periodogram.bls || {};
-          const tls = data.periodogram.tls || {};
-
-          if (bls.is_available) {
-            document.getElementById('blsPeriod').innerText = `${bls.best_period_days.toFixed(4)} d`;
-            document.getElementById('blsMetric').innerText = `SNR = ${bls.peak_snr}`;
-            document.getElementById('blsEpoch').innerText = bls.best_t0_btjd ? bls.best_t0_btjd.toFixed(4) : '--';
-            document.getElementById('blsDuration').innerText = bls.best_duration_hours ? `${bls.best_duration_hours.toFixed(2)} h` : '--';
-            document.getElementById('blsAgreement').innerText = bls.compared_to_ephemeris ? (bls.is_period_match ? `Match (${bls.period_diff_percent}%)` : (bls.is_harmonic ? `Harmonic (${bls.harmonic_relation})` : `Diff: ${bls.period_diff_percent || 'N/A'}%`)) : 'Recovered (Blind Search)';
-          } else {
-            document.getElementById('blsPeriod').innerText = 'Unavailable';
-            document.getElementById('blsMetric').innerText = bls.reason || 'Not executed';
-            document.getElementById('blsEpoch').innerText = '--';
-            document.getElementById('blsDuration').innerText = '--';
-            document.getElementById('blsAgreement').innerText = '--';
-          }
-
-          if (tls.is_available) {
-            document.getElementById('tlsPeriod').innerText = `${tls.best_period_days.toFixed(4)} d`;
-            document.getElementById('tlsMetric').innerText = `SDE = ${tls.sde}`;
-            document.getElementById('tlsEpoch').innerText = tls.best_t0_btjd ? tls.best_t0_btjd.toFixed(4) : '--';
-            document.getElementById('tlsDuration').innerText = tls.best_duration_hours ? `${tls.best_duration_hours.toFixed(2)} h` : '--';
-            document.getElementById('tlsOddEven').innerText = tls.odd_even_mismatch !== null ? tls.odd_even_mismatch.toFixed(2) : '--';
-            document.getElementById('tlsAgreement').innerText = tls.compared_to_ephemeris ? (tls.is_period_match ? `Match (${tls.period_diff_percent}%)` : (tls.is_harmonic ? `Harmonic (${tls.harmonic_relation})` : `Diff: ${tls.period_diff_percent || 'N/A'}%`)) : 'Recovered (Blind Search)';
-          } else {
-            document.getElementById('tlsPeriod').innerText = 'Unavailable';
-            document.getElementById('tlsMetric').innerText = tls.reason || 'Not executed';
-            document.getElementById('tlsEpoch').innerText = '--';
-            document.getElementById('tlsDuration').innerText = '--';
-            document.getElementById('tlsOddEven').innerText = '--';
-            document.getElementById('tlsAgreement').innerText = '--';
-          }
-        }
+        renderVettingResults(data);
       } catch (err) {
-        console.error(err);
         errBox.textContent = `Network Error: ${err.message}`;
         errBox.style.display = 'block';
       } finally {
         btn.innerText = 'Execute Vetting & Evidence Generation';
         btn.disabled = false;
+      }
+    }
+
+    function renderVettingResults(data) {
+      const statusBanner = document.getElementById('statusBanner');
+      statusBanner.className = 'synthetic-banner';
+      statusBanner.style.background = 'rgba(16, 185, 129, 0.12)';
+      statusBanner.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+      statusBanner.style.color = '#a7f3d0';
+      statusBanner.textContent = `REAL OBSERVED DATA — Evaluated from TESS observation (${data.fits_file_used}).`;
+      statusBanner.style.display = 'flex';
+
+      // Render upload audit if available
+      const auditPanel = document.getElementById('uploadAuditPanel');
+      if (data.upload_audit) {
+        auditPanel.style.display = 'block';
+        const aud = data.upload_audit;
+        document.getElementById('auditSha256').innerText = aud.sha256;
+        document.getElementById('auditFileSize').innerText = `${(aud.file_size_bytes / (1024*1024)).toFixed(2)} MB`;
+        const pill = document.getElementById('auditPipelinePill');
+        const origin = aud.pipeline_origin || 'TESS_GENERIC';
+        pill.innerText = origin === 'TESS_QLP' ? 'QLP' : (origin === 'TESS_SPOC' ? 'SPOC' : 'GENERIC');
+        pill.className = origin === 'TESS_QLP' ? 'pill pill-qlp' : (origin === 'TESS_SPOC' ? 'pill pill-spoc' : 'pill');
+
+        const meta = aud.metadata || {};
+        document.getElementById('auditTargetSector').innerText = `TIC ${meta.tic_id || 'N/A'} | Sector ${meta.sector || 'N/A'}`;
+        const cAudit = aud.cadence_audit || {};
+        document.getElementById('auditCadenceRetention').innerText = `${cAudit.usable_cadences || 0} / ${cAudit.raw_total_cadences || 0} (${cAudit.retention_percentage || 0}%)`;
+        document.getElementById('auditSegmentsCount').innerText = `${aud.segments ? aud.segments.length : 0} observing segments`;
+
+        const warnEl = document.getElementById('auditWarnings');
+        if (aud.warnings && aud.warnings.length > 0) {
+          warnEl.innerHTML = `<strong>Warnings:</strong> ${aud.warnings.join('; ')}`;
+        } else {
+          warnEl.innerHTML = '';
+        }
+      } else {
+        auditPanel.style.display = 'none';
+      }
+
+      document.getElementById('valBaselineScore').innerText = data.baseline_score !== null ? data.baseline_score.toFixed(4) : 'N/A';
+      document.getElementById('valBaselineMode').innerText = `[${data.baseline_execution_mode || 'BASELINE_UNAVAILABLE'}]`;
+      document.getElementById('noteBaseline').innerText = data.baseline_score !== null ? 'ExoMiner baseline model score' : 'Baseline unavailable in catalog / container daemon absent';
+
+      document.getElementById('valAstrovetScore').innerText = data.astrovet_raw_score !== null ? data.astrovet_raw_score.toFixed(4) : 'N/A';
+      document.getElementById('valAstrovetMode').innerText = `[${data.score_type ? data.score_type.toUpperCase() : 'HEURISTIC'}]`;
+      document.getElementById('noteAstrovet').innerText = data.score_type === 'fitted_fusion_score' ? 'Fitted fusion ranking score (not a probability)' : 'Heuristic triage score (uncalibrated)';
+
+      document.getElementById('valCalibratedProb').innerText = data.calibrated_planet_like_probability !== null ? data.calibrated_planet_like_probability.toFixed(4) : 'N/A';
+      document.getElementById('valCalibratedMode').innerText = data.is_calibrated ? '[CALIBRATED]' : '[NOT_CALIBRATED]';
+      const calibrationScope = data.calibration_provenance || '';
+      document.getElementById('noteCalibrated').innerText = !data.is_calibrated
+        ? 'No fitted calibrator supplied'
+        : (calibrationScope.toLowerCase().includes('selected toi')
+          ? 'Calibrated on selected TOI follow-up hosts; not a population-wide probability'
+          : 'Fitted Platt calibration; check report for scope');
+
+      document.getElementById('valUncertainty').innerText = data.predictive_uncertainty !== null ? `±${data.predictive_uncertainty.toFixed(3)}` : 'N/A';
+      document.getElementById('valUncertaintyMode').innerText = (data.predictive_uncertainty !== null && data.predictive_uncertainty < 0.3) ? '[LOW_UNCERTAINTY]' : '[HIGH_UNCERTAINTY]';
+      document.getElementById('noteUncertainty').innerText = (data.predictive_uncertainty !== null && data.predictive_uncertainty < 0.3) ? 'Within confidence margin' : 'Human review required for final triage';
+
+      document.getElementById('sslStatus').innerText = data.ssl_representation_available ? 'ACTIVE (real-data encoder)' : 'UNAVAILABLE (checkpoint not configured)';
+      const scoreExplanation = data.score_explanation || {};
+      const explanationLines = [`Basis: ${scoreExplanation.basis || 'unavailable'}`];
+      if (scoreExplanation.positive_signal) {
+        explanationLines.push(`Positive input: ${scoreExplanation.positive_signal.feature} = ${Number(scoreExplanation.positive_signal.value).toFixed(4)}`);
+        Object.entries(scoreExplanation.penalties || {}).forEach(([name, value]) => explanationLines.push(`Penalty (${name.replace(/_/g, ' ')}): ${Number(value).toFixed(4)}`));
+      }
+      if (scoreExplanation.top_contributions) {
+        scoreExplanation.top_contributions.forEach(item => explanationLines.push(`${item.feature}: ${Number(item.logit_contribution).toFixed(5)} logit`));
+      }
+      if (scoreExplanation.note) explanationLines.push(scoreExplanation.note);
+      document.getElementById('scoreExplanation').innerText = explanationLines.join('\n');
+
+      const badge = document.getElementById('triageBadge');
+      badge.innerText = data.class_or_triage_state.replace(/_/g, ' ');
+      if (data.class_or_triage_state === 'PLANET_LIKE') {
+        badge.className = 'triage-badge badge-candidate';
+      } else if (data.class_or_triage_state === 'FALSE_POSITIVE_LIKE') {
+        badge.className = 'triage-badge badge-false-positive';
+      } else {
+        badge.className = 'triage-badge badge-review';
+      }
+
+      // Physics table
+      const diag = data.diagnostics || {};
+      const pBody = document.getElementById('physicsTableBody');
+      pBody.innerHTML = `
+        <tr>
+          <td>Transit Template Depth</td>
+          <td class="font-mono">${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? diag.transit_depth_fitted_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
+          <td><span style="color:${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? '#10b981' : '#94a3b8'};">${diag.transit_depth_fitted_ppm !== null && diag.transit_depth_fitted_ppm !== undefined ? 'Available' : 'N/A'}</span></td>
+          <td>Limb-darkened template fit</td>
+        </tr>
+        <tr>
+          <td>Transit Duration</td>
+          <td class="font-mono">${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? diag.transit_duration_fitted_hours.toFixed(3) + ' hours' : 'N/A'}</td>
+          <td><span style="color:${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? '#10b981' : '#94a3b8'};">${diag.transit_duration_fitted_hours !== null && diag.transit_duration_fitted_hours !== undefined ? 'Available' : 'N/A'}</span></td>
+          <td>Contact I-IV estimate</td>
+        </tr>
+        <tr>
+          <td>Reduced &chi;<sup>2</sup></td>
+          <td class="font-mono">${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? diag.fit_chi2_reduced.toFixed(3) : 'N/A'}</td>
+          <td><span style="color:${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? '#10b981' : '#94a3b8'};">${diag.fit_chi2_reduced !== null && diag.fit_chi2_reduced !== undefined ? 'Available' : 'N/A'}</span></td>
+          <td>Residual template goodness-of-fit</td>
+        </tr>
+        <tr>
+          <td>Odd vs. Even Consistency</td>
+          <td class="font-mono">${diag.odd_even_depth_diff_ppm !== null && diag.odd_even_depth_diff_ppm !== undefined ? '&Delta; = ' + diag.odd_even_depth_diff_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
+          <td><span style="color:${diag.odd_even_consistent ? '#10b981' : (diag.odd_even_consistent === false ? '#ef4444' : '#94a3b8')};">${diag.odd_even_consistent === true ? 'Consistent' : (diag.odd_even_consistent === false ? 'Discrepant' : 'N/A')}</span></td>
+          <td>Odd/even consistency screen</td>
+        </tr>
+        <tr>
+          <td>Secondary Eclipse</td>
+          <td class="font-mono">${diag.secondary_depth_ppm !== null && diag.secondary_depth_ppm !== undefined ? 'Depth = ' + diag.secondary_depth_ppm.toFixed(2) + ' ppm' : 'N/A'}</td>
+          <td><span style="color:${diag.secondary_eclipse_detected ? '#ef4444' : (diag.secondary_eclipse_detected === false ? '#10b981' : '#94a3b8')};">${diag.secondary_eclipse_detected ? 'Detected (EB risk)' : (diag.secondary_eclipse_detected === false ? 'Not detected' : 'N/A')}</span></td>
+          <td>Phase 0.5 occultation search</td>
+        </tr>
+      `;
+
+      if (data.plot_url) {
+        const plotImg = document.getElementById('diagnosticPlot');
+        const plotPlaceholder = document.getElementById('plotPlaceholder');
+        plotImg.src = `${data.plot_url}?t=${new Date().getTime()}`;
+        plotImg.style.display = 'block';
+        plotPlaceholder.style.display = 'none';
+      }
+
+      if (data.periodogram) {
+        const bls = data.periodogram.bls || {};
+        const tls = data.periodogram.tls || {};
+
+        if (bls.is_available) {
+          document.getElementById('blsPeriod').innerText = `${bls.best_period_days.toFixed(4)} d`;
+          document.getElementById('blsMetric').innerText = `SNR = ${bls.peak_snr}`;
+          document.getElementById('blsEpoch').innerText = bls.best_t0_btjd ? bls.best_t0_btjd.toFixed(4) : '--';
+          document.getElementById('blsDuration').innerText = bls.best_duration_hours ? `${bls.best_duration_hours.toFixed(2)} h` : '--';
+          document.getElementById('blsAgreement').innerText = bls.compared_to_ephemeris ? (bls.is_period_match ? `Match (${bls.period_diff_percent}%)` : (bls.is_harmonic ? `Harmonic (${bls.harmonic_relation})` : `Diff: ${bls.period_diff_percent || 'N/A'}%`)) : 'Recovered';
+        } else {
+          document.getElementById('blsPeriod').innerText = 'Unavailable';
+          document.getElementById('blsMetric').innerText = bls.reason || 'Not executed';
+        }
+
+        if (tls.is_available) {
+          document.getElementById('tlsPeriod').innerText = `${tls.best_period_days.toFixed(4)} d`;
+          document.getElementById('tlsMetric').innerText = `SDE = ${tls.sde}`;
+          document.getElementById('tlsEpoch').innerText = tls.best_t0_btjd ? tls.best_t0_btjd.toFixed(4) : '--';
+          document.getElementById('tlsDuration').innerText = tls.best_duration_hours ? `${tls.best_duration_hours.toFixed(2)} h` : '--';
+          document.getElementById('tlsOddEven').innerText = tls.odd_even_mismatch !== null ? tls.odd_even_mismatch.toFixed(2) : '--';
+          document.getElementById('tlsAgreement').innerText = tls.compared_to_ephemeris ? (tls.is_period_match ? `Match (${tls.period_diff_percent}%)` : (tls.is_harmonic ? `Harmonic (${tls.harmonic_relation})` : `Diff: ${tls.period_diff_percent || 'N/A'}%`)) : 'Recovered';
+        } else {
+          document.getElementById('tlsPeriod').innerText = 'Unavailable';
+          document.getElementById('tlsMetric').innerText = tls.reason || 'Not executed';
+        }
       }
     }
   </script>

@@ -8,10 +8,22 @@ from http.server import HTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
-from astrovet.ui.server import AstrovetDashboardHandler
+from astrovet.ui.server import AstrovetDashboardHandler, resolve_ssl_checkpoint
 
 
 class TestDashboardUI(unittest.TestCase):
+    def test_ssl_checkpoint_environment_override(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            checkpoint = Path(temp_dir) / "encoder.npz"
+            checkpoint.write_bytes(b"checkpoint placeholder")
+            with patch.dict(os.environ, {"ASTROVET_SSL_CHECKPOINT": str(checkpoint)}):
+                self.assertEqual(resolve_ssl_checkpoint(), checkpoint.resolve())
+            with patch.dict(os.environ, {"ASTROVET_SSL_CHECKPOINT": str(checkpoint.with_name("missing.npz"))}):
+                with self.assertRaises(FileNotFoundError):
+                    resolve_ssl_checkpoint()
+
     @classmethod
     def setUpClass(cls):
         # Bind to ephemeral port
@@ -55,6 +67,8 @@ class TestDashboardUI(unittest.TestCase):
 
     def test_api_vet_candidate(self):
         """Test running real candidate through the dashboard API."""
+        if not Path("data/raw/mast/tess_s0023_390651552_spoc_lc.fits").is_file():
+            self.skipTest("Optional observed SPOC FITS fixture is not installed")
         url = f"http://127.0.0.1:{self.port}/api/vet?candidate_id=390651552-1-S23"
         with urllib.request.urlopen(url) as resp:
             self.assertEqual(resp.status, 200)
@@ -69,7 +83,10 @@ class TestDashboardUI(unittest.TestCase):
             self.assertTrue(data["periodogram"]["bls"]["is_available"])
             self.assertTrue(data["periodogram"]["tls"]["is_available"])
             self.assertIn("transit_depth_fitted_ppm", data["diagnostics"])
-            self.assertFalse(data["diagnostics"]["modality_availability"]["ssl_representation"])
+            self.assertEqual(
+                data["diagnostics"]["modality_availability"]["ssl_representation"],
+                resolve_ssl_checkpoint() is not None,
+            )
 
     def test_api_vet_missing_candidate_id_fails_400(self):
         """Verify request without candidate_id or with blank string returns HTTP 400."""
@@ -120,6 +137,8 @@ class TestDashboardUI(unittest.TestCase):
 
     def test_api_vet_bls_tls_unavailable_reporting(self):
         """Verify dashboard API gracefully reports unavailable BLS/TLS with explicit reasons."""
+        if not Path("data/raw/mast/tess_s0023_390651552_spoc_lc.fits").is_file():
+            self.skipTest("Optional observed SPOC FITS fixture is not installed")
         mock_pgram = {
             "bls": {"is_available": False, "reason": "Insufficient non-gap flux points for box model"},
             "tls": {"is_available": False, "reason": "Light curve too sparse for limb-darkened search"},
@@ -136,6 +155,95 @@ class TestDashboardUI(unittest.TestCase):
                 self.assertEqual(pgram["bls"]["reason"], "Insufficient non-gap flux points for box model")
                 self.assertFalse(pgram["tls"]["is_available"])
                 self.assertEqual(pgram["tls"]["reason"], "Light curve too sparse for limb-darkened search")
+
+
+
+    def test_upload_and_vet_valid_fits(self):
+        """Test uploading a real FITS light curve and executing vetting in one action."""
+        sample_fits = Path("data/raw/mast/tess_s0023_390651552_spoc_lc.fits")
+        if not sample_fits.is_file():
+            self.skipTest("Optional local SPOC FITS integration fixture is not installed")
+        fits_bytes = sample_fits.read_bytes()
+
+        boundary = "---------------------------974767299852498929531610575"
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="uploaded_spoc_test.fits"\r\n'
+            f"Content-Type: application/octet-stream\r\n\r\n"
+        ).encode("utf-8") + fits_bytes + (
+            f"\r\n--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="candidate_id"\r\n\r\n'
+            f"390651552-1-S23\r\n"
+            f"--{boundary}--\r\n"
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/upload_and_vet",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST",
+        )
+
+        with urllib.request.urlopen(req) as resp:
+            self.assertEqual(resp.status, 200)
+            data = json.loads(resp.read().decode("utf-8"))
+            self.assertEqual(data["candidate_id"], "390651552-1-S23")
+            self.assertIn("upload_audit", data)
+            aud = data["upload_audit"]
+            self.assertEqual(aud["pipeline_origin"], "TESS_SPOC")
+            self.assertEqual(aud["metadata"]["tic_id"], 390651552)
+            self.assertGreater(aud["cadence_audit"]["usable_cadences"], 1000)
+            self.assertIn("class_or_triage_state", data)
+            self.assertIn("plot_url", data)
+
+    def test_upload_rejects_empty_file(self):
+        boundary = "---------------------------974767299852498929531610575"
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="empty.fits"\r\n'
+            f"Content-Type: application/octet-stream\r\n\r\n\r\n"
+            f"--{boundary}--\r\n"
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/upload_and_vet",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req)
+        self.assertEqual(ctx.exception.code, 400)
+
+    def test_upload_rejects_invalid_extension(self):
+        boundary = "---------------------------974767299852498929531610575"
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="test.txt"\r\n'
+            f"Content-Type: text/plain\r\n\r\n"
+            f"Hello world\r\n"
+            f"--{boundary}--\r\n"
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/upload_and_vet",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req)
+        self.assertEqual(ctx.exception.code, 400)
+        err = json.loads(ctx.exception.read().decode("utf-8"))
+        self.assertIn("Invalid file extension", err["error"])
+
+    def test_api_vet_rejects_arbitrary_server_paths(self):
+        url = f"http://127.0.0.1:{self.port}/api/vet?candidate_id=390651552-1-S23&fits_file=/etc/passwd"
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(url)
+        self.assertEqual(ctx.exception.code, 400)
+        err = json.loads(ctx.exception.read().decode("utf-8"))
+        self.assertIn("Arbitrary server file paths are not permitted", err["error"])
 
 
 if __name__ == "__main__":

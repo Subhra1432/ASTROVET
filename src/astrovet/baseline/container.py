@@ -22,7 +22,10 @@ from astrovet.ids import parse_candidate_string
 from astrovet.schemas.baseline import BaselinePrediction
 
 
-EXOMINER_DEFAULT_IMAGE = "ghcr.io/nasa/exominer:v1.0.0"
+# OCI index digest for the official NASA multi-architecture ExoMiner image,
+# verified from ghcr.io on 2026-10-29. The v1.0.0 tag is a Git release tag,
+# not a published container tag.
+EXOMINER_DEFAULT_IMAGE = "ghcr.io/nasa/exominer@sha256:1b7ffac9db8afe1787ec9a0464ed8cc16ab91b7a280e6e824c27e3a121b0c6e9"
 
 
 class ExoMinerContainerRunner:
@@ -58,6 +61,7 @@ class ExoMinerContainerRunner:
         period: Optional[float] = None,
         epoch: Optional[float] = None,
         duration_hours: Optional[float] = None,
+        use_local_lightcurves: bool = False,
     ) -> List[str]:
         """
         Build the container execution command list.
@@ -66,6 +70,8 @@ class ExoMinerContainerRunner:
         out_path = str(Path(output_dir).resolve())
         engine_bin = self.engine or "podman"
 
+        # Official ExoMiner's image entrypoint is run_pipeline.py. It takes
+        # --tic_ids / --output_dir options (not the fictional run --tic CLI).
         cmd = [
             engine_bin,
             "run",
@@ -73,16 +79,18 @@ class ExoMinerContainerRunner:
             "-v", f"{in_path}:/workspace/input:ro",
             "-v", f"{out_path}:/workspace/output",
             self.image_name,
-            "python", "-m", "exominer_pipeline.run",
-            "--tic", str(tic_id),
-            "--sector", str(sector),
+            "--output_dir=/workspace/output",
+            "--tic_ids", f"{tic_id}_{sector}",
+            "--data_collection_mode=2min",
+            "--num_processes=1",
+            "--num_jobs=1",
+            "--get_mast_urls_dv_reports=false",
+            "--task=phot-vetting",
+            "--exominer_model=single",
+            "--max_model_workers=1",
         ]
-        if period is not None:
-            cmd.extend(["--period", str(period)])
-        if epoch is not None:
-            cmd.extend(["--epoch", str(epoch)])
-        if duration_hours is not None:
-            cmd.extend(["--duration-hours", str(duration_hours)])
+        if use_local_lightcurves:
+            cmd.append("--lc_data_repository=/workspace/input")
 
         return cmd
 
@@ -120,11 +128,24 @@ class ExoMinerContainerRunner:
                 "duration_hours": duration_hours,
             }, f, indent=2)
 
-        # Copy or symlink target FITS if provided
+        # The NASA pipeline consumes SPOC 2-minute FITS plus DV XML. QLP or
+        # non-2-minute uploads are not valid substitutes; let the official
+        # pipeline retrieve its own SPOC inputs in that case.
+        use_local_lightcurves = False
         if fits_path and Path(fits_path).is_file():
-            dest_fits = in_dir / Path(fits_path).name
-            if not dest_fits.exists():
-                shutil.copy2(fits_path, dest_fits)
+            try:
+                from astrovet.lightcurves.reader import read_tess_fits_lightcurve
+                raw = read_tess_fits_lightcurve(fits_path)
+                cadence = raw.cadence_seconds
+                use_local_lightcurves = (
+                    raw.pipeline_origin == "TESS_SPOC"
+                    and cadence is not None
+                    and 110.0 <= float(cadence) <= 130.0
+                )
+                if use_local_lightcurves:
+                    shutil.copy2(fits_path, in_dir / Path(fits_path).name)
+            except Exception:
+                use_local_lightcurves = False
 
         cmd = self.build_command(
             input_dir=in_dir,
@@ -134,6 +155,7 @@ class ExoMinerContainerRunner:
             period=period,
             epoch=epoch,
             duration_hours=duration_hours,
+            use_local_lightcurves=use_local_lightcurves,
         )
 
         # If container runtime is unavailable, handle gracefully
@@ -171,19 +193,37 @@ class ExoMinerContainerRunner:
                 check=False,
             )
 
-            # Inspect output directory for container predictions
-            pred_file = out_dir / "prediction.json"
-            if res.returncode == 0 and pred_file.is_file():
-                with open(pred_file, "r", encoding="utf-8") as pf:
-                    data = json.load(pf)
+            # Official pipeline writes predictions_<run_name>.csv with comment
+            # metadata and score_PC/AFP/NTP columns.
+            prediction_files = sorted(out_dir.glob("predictions_*.csv"))
+            if res.returncode == 0 and prediction_files:
+                import pandas as pd
+                predictions = pd.concat(
+                    [pd.read_csv(path, comment="#", low_memory=False) for path in prediction_files],
+                    ignore_index=True,
+                )
+                uid_col = next((c for c in ("uid", "TCE ID", "candidate_id") if c in predictions.columns), None)
+                if uid_col is None:
+                    raise ValueError("ExoMiner output has no uid/TCE ID column")
+                matches = predictions[predictions[uid_col].astype(str).str.strip() == candidate_id]
+                if matches.empty:
+                    raise LookupError(f"ExoMiner completed but did not return requested TCE {candidate_id}")
+                row = matches.iloc[0]
+                data = row.where(pd.notna(row), None).to_dict()
+                pc_score = data.get("score_PC", data.get("ExoMiner Score", data.get("score")))
+                afp_score = data.get("score_AFP")
+                ntp_score = data.get("score_NTP")
+                uncertainty = data.get("score_std_PC", data.get("score_std", data.get("ExoMiner Unc. Score")))
+                if pc_score is None:
+                    raise ValueError("ExoMiner output row contains no PC/planet score column")
                 return BaselinePrediction(
                     candidate_id=candidate_id,
-                    upstream_model=f"ExoMiner++_v1.0.0 (Container: {self.image_name})",
-                    score=float(data.get("score", 0.0)),
-                    score_pc=data.get("score_pc"),
-                    score_afp=data.get("score_afp"),
-                    score_ntp=data.get("score_ntp"),
-                    score_uncertainty=data.get("score_uncertainty", 0.0),
+                    upstream_model=f"NASA ExoMiner++ phot-vetting (Container: {self.image_name})",
+                    score=float(pc_score),
+                    score_pc=float(pc_score),
+                    score_afp=float(afp_score) if afp_score is not None else None,
+                    score_ntp=float(ntp_score) if ntp_score is not None else None,
+                    score_uncertainty=float(uncertainty) if uncertainty is not None else None,
                     status="SUCCESS",
                     execution_mode="CONTAINER_PROCESS",
                     is_synthetic=False,
@@ -199,7 +239,7 @@ class ExoMinerContainerRunner:
 
                 return BaselinePrediction(
                     candidate_id=candidate_id,
-                    upstream_model=f"ExoMiner++_v1.0.0 (Container: {self.image_name})",
+                    upstream_model=f"NASA ExoMiner++ phot-vetting (Container: {self.image_name})",
                     score=None,
                     status="CONTAINER_ERROR",
                     execution_mode="CONTAINER_PROCESS",
@@ -210,7 +250,7 @@ class ExoMinerContainerRunner:
         except subprocess.TimeoutExpired:
             return BaselinePrediction(
                 candidate_id=candidate_id,
-                upstream_model=f"ExoMiner++_v1.0.0 (Container: {self.image_name})",
+                upstream_model=f"NASA ExoMiner++ phot-vetting (Container: {self.image_name})",
                 score=None,
                 status="CONTAINER_TIMEOUT",
                 execution_mode="CONTAINER_PROCESS",
@@ -220,7 +260,7 @@ class ExoMinerContainerRunner:
         except Exception as e:
             return BaselinePrediction(
                 candidate_id=candidate_id,
-                upstream_model=f"ExoMiner++_v1.0.0 (Container: {self.image_name})",
+                upstream_model=f"NASA ExoMiner++ phot-vetting (Container: {self.image_name})",
                 score=None,
                 status="ERROR",
                 execution_mode="CONTAINER_PROCESS",

@@ -44,6 +44,9 @@ REASON_CODE_DESCRIPTIONS = {
         "Periodogram search (BLS/TLS) recovered a dominant periodicity differing significantly (>1.5%) "
         "from the candidate catalog ephemeris, suggesting possible misidentification or alias."
     ),
+    "BLS_TLS_PERIOD_DISAGREEMENT": (
+        "BLS and TLS selected materially different periods. The conflicting searches need human review; neither peak alone validates a planet."
+    ),
     "PERIODICITY_HARMONIC_DETECTED": (
         "Periodogram search detected an integer multiple or submultiple (harmonic/subharmonic) of the reported period, "
         "often indicative of equal-depth eclipsing binaries (period doubled) or aliases."

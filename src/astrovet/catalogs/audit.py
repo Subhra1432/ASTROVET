@@ -45,8 +45,21 @@ def audit_catalog_csv(
     file_size_bytes = p.stat().st_size
     file_sha256 = compute_sha256(p)
 
-    # Read dataframe
-    df = pd.read_csv(p, low_memory=False)
+    # Read dataframe with comment header and unit row detection
+    try:
+        with open(p, 'r', encoding='utf-8', errors='ignore') as f_in:
+            first_line = f_in.readline().strip()
+        if first_line.startswith('#'):
+            df = pd.read_csv(p, comment='#', low_memory=False)
+        else:
+            df = pd.read_csv(p, low_memory=False)
+    except Exception:
+        df = pd.read_csv(p, low_memory=False)
+
+    # Detect and drop unit specification rows (e.g., TIC ID is NaN and units present)
+    if len(df) > 0 and (pd.isna(df.iloc[0, 0]) or str(df.iloc[0].get('Epoch', '')).strip() in ['BTJD', 'days', 'ppm']):
+        df = df.iloc[1:].reset_index(drop=True)
+
     row_count, col_count = df.shape
     columns = list(df.columns)
 

@@ -66,6 +66,16 @@ class TestSelfSupervisedLearning(unittest.TestCase):
         self.assertEqual(embeddings.shape, (2, 16))
         self.assertFalse(np.any(np.isnan(embeddings)))
 
+    def test_encoder_normalizes_flux_units_robustly(self):
+        """SSL inputs remain bounded and unitless across ppm/relative flux scales."""
+        encoder = SelfSupervisedTransitEncoder(input_dim=200, hidden_dim=32, embedding_dim=16)
+        relative = self.views[:2]
+        ppm = relative * 1_000_000.0
+        clean_relative = encoder._clean_input(relative)
+        clean_ppm = encoder._clean_input(ppm)
+        np.testing.assert_allclose(clean_relative, clean_ppm, atol=1e-8)
+        self.assertLessEqual(float(np.max(np.abs(clean_ppm))), 8.0)
+
     def test_real_fits_view_extraction(self):
         """Verify real unlabeled TESS FITS light curve is parsed, filtered, and converted to valid views."""
         fits_file = Path("data/raw/mast/tess_s0023_390651552_spoc_lc.fits")

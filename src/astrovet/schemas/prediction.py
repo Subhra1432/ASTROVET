@@ -109,6 +109,10 @@ class AstrovetPrediction(BaseModel):
     physics_diagnostics: PhysicsDiagnostics = Field(default_factory=PhysicsDiagnostics)
     periodogram_diagnostics: Optional[Dict[str, Any]] = Field(default=None, description="BLS and TLS periodicity search outputs")
     reason_codes: List[str] = Field(default_factory=list, description="Machine and human reviewable reason codes")
+    explanation: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Per-candidate score decomposition; explicitly distinguishes learned contributions from heuristic terms",
+    )
     
     # Provenance
     is_synthetic: bool = Field(default=False, description="Flag indicating synthetic demonstration/test fixture")

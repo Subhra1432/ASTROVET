@@ -102,6 +102,9 @@ class TestCLIIntegrationBranches(unittest.TestCase):
 
     def test_cli_explain_with_container_baseline_branch_fallback(self):
         """Verify explain command invokes container runner and handles runtime-unavailable fallback."""
+        sample_fits = Path("data/raw/mast/tess_s0023_390651552_spoc_lc.fits")
+        if not sample_fits.is_file():
+            self.skipTest("Optional observed SPOC FITS fixture is not installed")
         res = self.runner.invoke(
             cli,
             [
@@ -117,6 +120,9 @@ class TestCLIIntegrationBranches(unittest.TestCase):
 
     def test_cli_explain_with_container_baseline_no_fallback(self):
         """Verify explain command without fallback marks baseline as unavailable without inventing scores."""
+        sample_fits = Path("data/raw/mast/tess_s0023_390651552_spoc_lc.fits")
+        if not sample_fits.is_file():
+            self.skipTest("Optional observed SPOC FITS fixture is not installed")
         res = self.runner.invoke(
             cli,
             [

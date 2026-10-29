@@ -50,6 +50,24 @@ class TestFusionAndReport(unittest.TestCase):
         self.assertIn("UNCALIBRATED_HEURISTIC_SCORE", pred_uncal.reason_codes)
         self.assertFalse(pred_uncal.ood_flag)
 
+        # Disagreeing periodicity searches are surfaced as review evidence.
+        p_diag_disagree = p_diag.model_copy(update={
+            "bls_is_match": False,
+            "tls_is_match": True,
+            "period_search_agreement": False,
+        })
+        pred_disagree = fusion.predict_single(
+            candidate_id="1001-1-S1",
+            tic_id=1001,
+            baseline_pred=b_pred,
+            physics_diag=p_diag_disagree,
+            ssl_embedding=np.zeros(16, dtype=np.float32),
+            run_id="test_periodogram_disagreement",
+        )
+        self.assertIn("PERIODICITY_MISMATCH", pred_disagree.reason_codes)
+        self.assertIn("BLS_TLS_PERIOD_DISAGREEMENT", pred_disagree.reason_codes)
+        self.assertEqual(pred_disagree.triage_state, TriageState.REVIEW_REQUIRED)
+
         # 2. Calibrated path with fitted calibrator
         calibrator = PlattCalibrator()
         # Mock fit on calibration partition

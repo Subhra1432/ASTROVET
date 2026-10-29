@@ -83,17 +83,34 @@ class SelfSupervisedTransitEncoder:
         return np.where(x > 0, 1.0, alpha)
 
     def _clean_input(self, views: np.ndarray) -> np.ndarray:
-        cleaned = np.empty_like(views, dtype=np.float64)
-        for i in range(len(views)):
-            row = views[i]
-            nans = np.isnan(row)
+        """Impute gaps and put each folded curve on a robust, unitless scale.
+
+        FITS products may contain flux near one, ppm values, or unnormalized
+        instrumental units. Per-view median/MAD normalization makes the SSL
+        objective insensitive to those unit choices while retaining transit
+        morphology. The original flux remains untouched in the physics branch.
+        """
+        arr = np.asarray(views, dtype=np.float64)
+        if arr.ndim != 2 or arr.shape[1] != self.input_dim:
+            raise ValueError(f"Expected views with shape (N, {self.input_dim}); got {arr.shape}")
+        cleaned = np.empty_like(arr, dtype=np.float64)
+        for i in range(len(arr)):
+            row = arr[i]
+            missing = ~np.isfinite(row)
+            nans = missing
             if np.all(nans):
-                cleaned[i] = 1.0
+                cleaned[i] = 0.0
             elif np.any(nans):
                 idx = np.arange(len(row))
                 cleaned[i] = np.interp(idx, idx[~nans], row[~nans])
             else:
                 cleaned[i] = row
+            finite = cleaned[i]
+            center = float(np.median(finite))
+            mad = float(np.median(np.abs(finite - center)))
+            # A floor protects nearly flat curves from numerical blow-up.
+            scale = max(1.4826 * mad, 1e-8 * max(1.0, abs(center)))
+            cleaned[i] = np.clip((finite - center) / scale, -8.0, 8.0)
         return cleaned
 
     def encode(self, views: np.ndarray) -> np.ndarray:
@@ -147,12 +164,13 @@ class SelfSupervisedTransitEncoder:
             for i in range(B):
                 masked = random_cadence_mask(X_target[i], mask_fraction=0.15, rng=self.rng)
                 mask_1[i] = np.isnan(masked)
-                # Impute masked positions with baseline 1.0 for network input
-                X_aug1[i] = np.where(mask_1[i], 1.0, masked)
-            X_aug1 = bounded_photometric_jitter(X_aug1, noise_sigma=0.0001, rng=self.rng)
+                # Inputs are robust-centered/scaled, so zero is the neutral
+                # normalized baseline at masked cadences.
+                X_aug1[i] = np.where(mask_1[i], 0.0, masked)
+            X_aug1 = bounded_photometric_jitter(X_aug1, noise_sigma=0.02, rng=self.rng)
 
             # Generate View 2: Different photometric jitter + slight mask
-            X_aug2 = bounded_photometric_jitter(X_target, noise_sigma=0.0002, rng=self.rng)
+            X_aug2 = bounded_photometric_jitter(X_target, noise_sigma=0.04, rng=self.rng)
 
             # --- Forward Pass View 1 ---
             h1_1 = X_aug1 @ self.W1 + self.b1
@@ -216,6 +234,15 @@ class SelfSupervisedTransitEncoder:
                 "W4": d_W4, "b4": d_b4,
             }
 
+            # Bound the combined gradient before Adam so unusual/outlier curves
+            # cannot send the hand-written NumPy optimizer into a divergent run.
+            grad_norm = float(np.sqrt(sum(np.sum(g * g) for g in grads.values())))
+            if not np.isfinite(grad_norm):
+                raise FloatingPointError("Non-finite SSL gradient; input data or model state is invalid")
+            if grad_norm > 5.0:
+                scale = 5.0 / grad_norm
+                grads = {name: grad * scale for name, grad in grads.items()}
+
             # --- Adam Optimizer Update ---
             self._step += 1
             beta1, beta2, eps = 0.9, 0.999, 1e-8
@@ -228,6 +255,9 @@ class SelfSupervisedTransitEncoder:
                 m_hat = self._m[k] / (1.0 - beta1 ** self._step)
                 v_hat = self._v[k] / (1.0 - beta2 ** self._step)
                 params[k] -= lr * m_hat / (np.sqrt(v_hat) + eps)
+
+            if not all(np.all(np.isfinite(param)) for param in params.values()):
+                raise FloatingPointError("SSL optimizer produced non-finite weights")
 
             total_loss += batch_loss
             total_recon += recon_loss

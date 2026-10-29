@@ -17,6 +17,7 @@ data/interim/
 data/processed/
 data/checkpoints/
 data/container_runs/
+data/uploads/
 artifacts/
 runs/
 *.fits

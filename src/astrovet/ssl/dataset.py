@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+import re
 import numpy as np
 
 from astrovet.lightcurves.reader import read_tess_fits_lightcurve
@@ -117,6 +118,8 @@ def extract_views_from_directory(
     view_length: int = 200,
     stride: int = 100,
     max_files: Optional[int] = None,
+    allowed_tic_ids: Optional[set[int]] = None,
+    sample_seed: int = 42,
 ) -> Tuple[np.ndarray, List[Dict[str, Any]]]:
     """
     Scan a directory for TESS FITS light curves, extracting views across all discovered files.
@@ -125,13 +128,29 @@ def extract_views_from_directory(
     if not root.is_dir():
         raise NotADirectoryError(f"Directory not found: {root}")
 
-    # Discover .fits and .fit files recursively
+    # Discover .fits and .fit files recursively. QLP TESS products in the
+    # Astronet-Triage catalog archive encode TIC ID as a zero-padded numeric
+    # token in the filename; allow filtering to the training-host split before
+    # opening data so validation/calibration/test hosts cannot enter SSL fit.
     fits_files = sorted([f for f in root.glob("**/*") if f.is_file() and f.suffix.lower() in [".fits", ".fit"]])
     if not fits_files:
         raise FileNotFoundError(f"No FITS light curves found in directory: {root}")
 
-    if max_files:
-        fits_files = fits_files[:max_files]
+    if allowed_tic_ids is not None:
+        allowed_tic_ids = {int(tic) for tic in allowed_tic_ids}
+        selected_files = []
+        for fpath in fits_files:
+            tic_tokens = re.findall(r"(?<!\d)(\d{13,16})(?!\d)", fpath.stem)
+            if tic_tokens and int(tic_tokens[-1]) in allowed_tic_ids:
+                selected_files.append(fpath)
+        fits_files = selected_files
+        if not fits_files:
+            raise ValueError("No FITS filenames matched the TIC IDs in the training-host split manifest.")
+
+    if max_files and len(fits_files) > max_files:
+        rng = np.random.default_rng(sample_seed)
+        chosen = sorted(rng.choice(len(fits_files), size=max_files, replace=False).tolist())
+        fits_files = [fits_files[i] for i in chosen]
 
     all_views: List[np.ndarray] = []
     metadata_list: List[Dict[str, Any]] = []
@@ -141,8 +160,16 @@ def extract_views_from_directory(
             views_arr, meta = extract_views_from_fits(fpath, view_length=view_length, stride=stride)
             all_views.append(views_arr)
             metadata_list.append(meta)
-        except Exception:
-            # Skip non-lightcurve or corrupt FITS files
+        except Exception as exc:
+            # Keep an explicit audit row instead of silently hiding corrupt,
+            # unsupported, or too-short products from training provenance.
+            metadata_list.append({
+                "file_path": str(fpath.resolve()),
+                "file_name": fpath.name,
+                "views_extracted": 0,
+                "skipped": True,
+                "skip_reason": f"{type(exc).__name__}: {exc}",
+            })
             continue
 
     if not all_views:

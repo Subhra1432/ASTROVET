@@ -4,9 +4,9 @@ NASA ExoMiner++ baseline adapter and candidate reconciliation.
 Scientific safeguards & scope:
 - Pinned upstream release tag: v1.0.0 (Git commit d877a23) from official NASA release.
 - Model / checkpoint name: "ExoMiner++ (TESS 2-min S1-S67)".
-- Adapter scope: Implements catalog lookup against published ExoMiner++ prediction tables
-  and an explicit synthetic fixture mode for testing. It does NOT implement live containerized
-  or subprocess pipeline execution.
+- Adapter scope: Implements catalog lookup against published ExoMiner++ prediction tables,
+  explicit synthetic fixtures for tests, and optional container execution through the official
+  upstream pipeline interface. Live container execution requires a working Docker/Podman daemon.
 - If a candidate is not found, score is None (NEVER fabricated as 0.50).
 - Checkpoint overlap audit: records whether evaluation targets were potentially seen in
   the baseline model's training set. If unknown, marks status as UNKNOWN to prevent inflated
@@ -29,6 +29,17 @@ EXOMINER_RELEASE_COMMIT = "d877a23"
 EXOMINER_MODEL_NAME = "ExoMiner++ (TESS 2-min S1-S67)"
 
 
+def find_default_catalog_path(project_root: Optional[str | Path] = None) -> Optional[Path]:
+    """Find ASTROVET-local or sibling upstream NASA ExoMiner prediction data."""
+    root = Path(project_root).resolve() if project_root else Path(__file__).resolve().parents[3]
+    filename = "exominer_vetting_tess-spoc-2-min-s1s67_dashtable_dvm-url_scoregt0.1.csv"
+    candidates = (
+        root / "data" / "catalogs" / "exominer_s1s67_catalog.csv",
+        root.parent / "ExoMiner-main" / "exominer_vetting_pc_catalog_dash-render-web-app" / "data" / filename,
+    )
+    return next((path for path in candidates if path.is_file()), None)
+
+
 class ExoMinerBaselineAdapter:
     """
     Thin, version-pinned adapter for NASA ExoMiner++.
@@ -43,7 +54,7 @@ class ExoMinerBaselineAdapter:
         model_name: str = EXOMINER_MODEL_NAME,
         is_synthetic: bool = False,
     ) -> None:
-        self.catalog_path = Path(catalog_path) if catalog_path else None
+        self.catalog_path = Path(catalog_path) if catalog_path else find_default_catalog_path()
         self.release_tag = release_tag
         self.release_commit = release_commit
         self.model_name = model_name

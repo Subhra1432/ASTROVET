@@ -14,6 +14,7 @@ Scientific safeguards:
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
@@ -86,13 +87,16 @@ def generate_candidate_markdown_report(
     # Render calibrated probability only when is_calibrated and value is present
     if prediction.is_calibrated and prediction.calibrated_planet_like_probability is not None:
         calib_prov = prediction.calibration_provenance if getattr(prediction, "calibration_provenance", None) else "Calibration provenance not recorded"
+        score_label = "TOI-Cohort Calibrated Planet-Like Score" if "selected TOI" in str(calib_prov) else "Calibrated Planet-Like Probability"
         lines.extend([
             f"| **ASTROVET Raw Score** | `{prediction.astrovet_raw_score:.4f}` | Predictive Unc: `+/- {prediction.predictive_uncertainty:.3f}` | `{prediction.score_type}` |",
-            f"| **Calibrated Planet-Like Probability** | **`{prediction.calibrated_planet_like_probability:.4f}`** | Fitted Platt Calibrator | {calib_prov} |",
+            f"| **{score_label}** | **`{prediction.calibrated_planet_like_probability:.4f}`** | Fitted Platt Calibrator | {calib_prov} |",
+            *(["> **Calibration limit:** This score is calibrated on a selected TOI follow-up cohort and is not a population-wide planet probability."] if "selected TOI" in str(calib_prov) else []),
         ])
     else:
+        score_label = "Uncalibrated Fitted Fusion Score" if prediction.score_type == "fitted_fusion_score" else "ASTROVET Score (Uncalibrated Heuristic)"
         lines.extend([
-            f"| **ASTROVET Score (Uncalibrated Heuristic)** | `{prediction.astrovet_raw_score:.4f}` | Predictive Unc: `+/- {prediction.predictive_uncertainty:.3f}` | Calibration was not applied |",
+            f"| **{score_label}** | `{prediction.astrovet_raw_score:.4f}` | Predictive Unc: `+/- {prediction.predictive_uncertainty:.3f}` | Calibration was not applied |",
         ])
 
     lines.extend([
@@ -147,9 +151,32 @@ def generate_candidate_markdown_report(
         lines.append("- *No negative diagnostic anomalies detected. Candidate exhibits consistent transit-like characteristics.*")
 
     lines.append("")
+    explanation = getattr(prediction, "explanation", {}) or {}
+    lines.extend(["## 6. Score Explanation", ""])
+    basis = explanation.get("basis", "unavailable")
+    lines.append(f"- **Explanation basis:** `{basis}`")
+    if "top_contributions" in explanation:
+        lines.append("- **Largest additive logit contributions:**")
+        for item in explanation["top_contributions"]:
+            lines.append(f"  - `{item['feature']}`: `{item['logit_contribution']:+.5f}`")
+        lines.append(f"- **Classifier intercept:** `{explanation.get('intercept', 'N/A')}`")
+        lines.append(f"- **Reconstructed classifier logit:** `{explanation.get('logit_reconstruction', 'N/A')}`")
+    if "positive_signal" in explanation:
+        signal = explanation["positive_signal"]
+        lines.append(f"- **Positive heuristic input:** `{signal['feature']}` = `{signal['value']:.4f}`")
+        for name, value in explanation.get("penalties", {}).items():
+            lines.append(f"- **Heuristic penalty ({name.replace('_', ' ')}):** `{value:.4f}`")
+        lines.append(f"- **Score after clipping:** `{explanation.get('raw_score_after_clipping', 'N/A')}`")
+    if explanation.get("note"):
+        lines.append(f"- {explanation['note']}")
+    if prediction.score_type == "fitted_fusion_score":
+        lines.append("- SSL embeddings are learned representations; their contribution is shown above, but it is an association learned by this research head, not direct physical evidence or causal proof.")
+    else:
+        lines.append("- SSL embeddings are representation features; without a trained downstream decision head, they do not independently classify a planet candidate.")
+    lines.append("")
     if plot_relative_path:
         lines.extend([
-            "## 6. Diagnostic Plots",
+            "## 7. Diagnostic Plots",
             "",
             f"![Vetting Diagnostic Plots]({plot_relative_path})",
             "",
@@ -191,6 +218,7 @@ def vet_and_generate_report(
     ssl_checkpoint: Optional[str | Path] = None,
     allow_synthetic: bool = False,
     synthetic_fixture_ok: bool = False,
+    model_artifact: Optional[str | Path] = None,
 ) -> dict:
     """
     End-to-end programmatic pipeline for candidate vetting and report generation.
@@ -210,6 +238,15 @@ def vet_and_generate_report(
     from astrovet.models.fusion import AstrovetFusionModel
     from astrovet.explain.plots import generate_candidate_diagnostic_plot
     from astrovet.schemas.candidate import CandidateRecord, Ephemeris
+    from astrovet.baseline.adapter import find_default_catalog_path
+
+    # Reject synthetic baseline selection before attempting data retrieval so
+    # the opt-in guard is deterministic even on machines without local FITS.
+    if baseline_mode == "synthetic" and not (allow_synthetic or synthetic_fixture_ok):
+        raise ValueError(
+            "Baseline mode 'synthetic' requires explicit opt-in (--allow-synthetic). "
+            "Normal scientific workflows require a real catalog or container baseline."
+        )
 
     project_root = Path(__file__).resolve().parents[3]
     if not Path(output_dir).is_absolute():
@@ -276,14 +313,8 @@ def vet_and_generate_report(
     clean_t, clean_f, clean_fe, q_rep = filter_quality_cadences(raw_lc.time, raw_lc.flux, raw_lc.flux_err, raw_lc.quality)
 
     # 2. Ephemeris Resolution: Supplied args -> Catalog Lookup -> BLS/TLS Recovery
-    dash_csv = project_root.parent / "ExoMiner-main" / "exominer_vetting_pc_catalog_dash-render-web-app" / "data" / "exominer_vetting_tess-spoc-2-min-s1s67_dashtable_dvm-url_scoregt0.1.csv"
-    if not dash_csv.is_file():
-        # Check in local data/catalogs
-        alt_csv = project_root / "data" / "catalogs" / "exominer_s1s67_catalog.csv"
-        if alt_csv.is_file():
-            dash_csv = alt_csv
-
-    cat_df = pd.read_csv(dash_csv, low_memory=False) if dash_csv.is_file() else pd.DataFrame()
+    dash_csv = find_default_catalog_path(project_root)
+    cat_df = pd.read_csv(dash_csv, low_memory=False) if dash_csv and dash_csv.is_file() else pd.DataFrame()
     matched_row = None
     if len(cat_df) > 0 and "TCE ID" in cat_df.columns:
         match_mask = cat_df["TCE ID"] == req_candidate_id
@@ -391,7 +422,7 @@ def vet_and_generate_report(
         adapter = ExoMinerBaselineAdapter(catalog_path=None, is_synthetic=True)
         b_pred = adapter.predict_candidate(req_candidate_id, req_tic, req_plnt, req_sec)
     elif baseline_mode == "container":
-        adapter = ExoMinerBaselineAdapter(catalog_path=dash_csv if dash_csv.is_file() else None, is_synthetic=False)
+        adapter = ExoMinerBaselineAdapter(catalog_path=dash_csv if dash_csv and dash_csv.is_file() else None, is_synthetic=False)
         b_pred = adapter.predict_via_container(
             candidate_id=req_candidate_id,
             fits_path=resolved_fits,
@@ -401,7 +432,7 @@ def vet_and_generate_report(
             fallback_to_catalog=container_fallback,
         )
     else:  # catalog
-        adapter = ExoMinerBaselineAdapter(catalog_path=dash_csv if dash_csv.is_file() else None, is_synthetic=False)
+        adapter = ExoMinerBaselineAdapter(catalog_path=dash_csv if dash_csv and dash_csv.is_file() else None, is_synthetic=False)
         b_pred = adapter.predict_candidate(req_candidate_id, req_tic, req_plnt, req_sec)
 
     # 7. Representation Branch (SSL Neural Encoder vs PCA Prototype)
@@ -427,7 +458,25 @@ def vet_and_generate_report(
     phys_diag.modality_availability["ssl_representation"] = emb is not None
 
     # 8. Late Fusion & Triage
-    fusion = AstrovetFusionModel()
+    # Explicit call argument wins; the dashboard/CLI can opt into a trained
+    # late-fusion bundle through this environment variable without silently
+    # treating a research artifact as the default for every user.
+    configured_fusion = os.environ.get("ASTROVET_FUSION_MODEL")
+    if model_artifact is None and configured_fusion:
+        model_artifact = configured_fusion
+        if not Path(model_artifact).is_file():
+            raise FileNotFoundError(f"ASTROVET_FUSION_MODEL points to a missing file: {model_artifact}")
+    if model_artifact and Path(model_artifact).is_file():
+        fusion = AstrovetFusionModel.load(model_artifact)
+    else:
+        default_art = project_root / "artifacts" / "models" / "fusion_classifier.joblib"
+        if default_art.is_file():
+            try:
+                fusion = AstrovetFusionModel.load(default_art)
+            except Exception:
+                fusion = AstrovetFusionModel()
+        else:
+            fusion = AstrovetFusionModel()
     pred = fusion.predict_single(
         candidate_id=req_candidate_id,
         tic_id=req_tic,
