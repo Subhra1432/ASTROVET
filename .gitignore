@@ -5,6 +5,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.pytest_cache/
 
 # Virtual Environments
 .venv/
@@ -17,6 +18,7 @@ data/interim/
 data/processed/
 data/checkpoints/
 data/container_runs/
+data/manifests/*.json
 data/uploads/
 artifacts/
 runs/
