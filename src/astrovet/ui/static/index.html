@@ -401,6 +401,8 @@
           <div class="form-group">
             <label for="duration">Duration (Hours)</label>
             <input type="number" step="0.001" id="duration" placeholder="Leave empty for blind recovery">
+            <label for="depth">Transit Depth (ppm, optional)</label>
+            <input type="number" step="any" id="depth" placeholder="For example, 1200">
           </div>
         </div>
 
@@ -638,6 +640,8 @@
       if (epoch) formData.append('epoch', epoch);
       const duration = document.getElementById('duration').value.trim();
       if (duration) formData.append('duration', duration);
+      const depth = document.getElementById('depth').value.trim();
+      if (depth) formData.append('depth', depth);
 
       try {
         const resp = await fetch('/api/upload_and_vet', {
@@ -683,6 +687,7 @@
       const period = document.getElementById('period').value.trim();
       const epoch = document.getElementById('epoch').value.trim();
       const duration = document.getElementById('duration').value.trim();
+      const depth = document.getElementById('depth').value.trim();
 
       const params = new URLSearchParams();
       params.append('candidate_id', candidateId);
@@ -691,6 +696,7 @@
       if (period) params.append('period', period);
       if (epoch) params.append('epoch', epoch);
       if (duration) params.append('duration', duration);
+      if (depth) params.append('depth', depth);
 
       try {
         const resp = await fetch(`/api/vet?${params.toString()}`);

@@ -435,6 +435,28 @@ def vet_and_generate_report(
         adapter = ExoMinerBaselineAdapter(catalog_path=dash_csv if dash_csv and dash_csv.is_file() else None, is_synthetic=False)
         b_pred = adapter.predict_candidate(req_candidate_id, req_tic, req_plnt, req_sec)
 
+    # Load the opt-in fusion artifact before embedding so its training-time
+    # encoder fingerprint can be checked before any prediction is produced.
+    from astrovet.models.fusion import AstrovetFusionModel, validate_ssl_checkpoint_compatibility
+
+    configured_fusion = os.environ.get("ASTROVET_FUSION_MODEL")
+    if model_artifact is None and configured_fusion:
+        model_artifact = configured_fusion
+        if not Path(model_artifact).is_file():
+            raise FileNotFoundError(f"ASTROVET_FUSION_MODEL points to a missing file: {model_artifact}")
+    if model_artifact and Path(model_artifact).is_file():
+        fusion = AstrovetFusionModel.load(model_artifact)
+    else:
+        default_art = project_root / "artifacts" / "models" / "fusion_classifier.joblib"
+        if default_art.is_file():
+            try:
+                fusion = AstrovetFusionModel.load(default_art)
+            except Exception:
+                fusion = AstrovetFusionModel()
+        else:
+            fusion = AstrovetFusionModel()
+    validate_ssl_checkpoint_compatibility(fusion, encoder_mode, ssl_checkpoint)
+
     # 7. Representation Branch (SSL Neural Encoder vs PCA Prototype)
     if encoder_mode == "ssl":
         # Never feed random, untrained weights into the fusion features. A missing
@@ -458,25 +480,6 @@ def vet_and_generate_report(
     phys_diag.modality_availability["ssl_representation"] = emb is not None
 
     # 8. Late Fusion & Triage
-    # Explicit call argument wins; the dashboard/CLI can opt into a trained
-    # late-fusion bundle through this environment variable without silently
-    # treating a research artifact as the default for every user.
-    configured_fusion = os.environ.get("ASTROVET_FUSION_MODEL")
-    if model_artifact is None and configured_fusion:
-        model_artifact = configured_fusion
-        if not Path(model_artifact).is_file():
-            raise FileNotFoundError(f"ASTROVET_FUSION_MODEL points to a missing file: {model_artifact}")
-    if model_artifact and Path(model_artifact).is_file():
-        fusion = AstrovetFusionModel.load(model_artifact)
-    else:
-        default_art = project_root / "artifacts" / "models" / "fusion_classifier.joblib"
-        if default_art.is_file():
-            try:
-                fusion = AstrovetFusionModel.load(default_art)
-            except Exception:
-                fusion = AstrovetFusionModel()
-        else:
-            fusion = AstrovetFusionModel()
     pred = fusion.predict_single(
         candidate_id=req_candidate_id,
         tic_id=req_tic,

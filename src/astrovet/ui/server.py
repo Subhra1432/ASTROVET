@@ -124,14 +124,18 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                 period = float(query["period"][0]) if "period" in query and query["period"][0] else None
                 epoch = float(query["epoch"][0]) if "epoch" in query and query["epoch"][0] else None
                 duration = float(query["duration"][0]) if "duration" in query and query["duration"][0] else None
+                depth = float(query["depth"][0]) if "depth" in query and query["depth"][0] else None
             except (TypeError, ValueError):
-                self._send_json_error(400, "period, epoch, and duration must be numeric values.")
+                self._send_json_error(400, "period, epoch, duration, and depth must be numeric values.")
                 return
-            if any(value is not None and not math.isfinite(value) for value in (period, epoch, duration)):
-                self._send_json_error(400, "period, epoch, and duration must be finite numeric values.")
+            if any(value is not None and not math.isfinite(value) for value in (period, epoch, duration, depth)):
+                self._send_json_error(400, "period, epoch, duration, and depth must be finite numeric values.")
                 return
             if period is not None and period <= 0 or duration is not None and duration <= 0:
                 self._send_json_error(400, "period and duration must be greater than zero.")
+                return
+            if depth is not None and depth <= 0:
+                self._send_json_error(400, "depth must be greater than zero.")
                 return
 
             try:
@@ -187,6 +191,7 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                     period=period,
                     epoch=epoch,
                     duration=duration,
+                    depth=depth,
                 )
                 self._send_json_success(payload)
             except Exception as e:
@@ -227,6 +232,7 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
             period: Optional[float] = None
             epoch: Optional[float] = None
             duration: Optional[float] = None
+            depth: Optional[float] = None
 
             if "multipart/form-data" in content_type:
                 # Parse standard multipart/form-data using standard library email parser
@@ -268,6 +274,13 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                                 duration = val
                         except Exception:
                             pass
+                    elif name == "depth" and payload:
+                        try:
+                            val = float(payload.decode("utf-8", errors="ignore").strip())
+                            if math.isfinite(val) and val > 0:
+                                depth = val
+                        except Exception:
+                            pass
             else:
                 # Raw binary upload with query parameters
                 file_bytes = body_bytes
@@ -283,6 +296,8 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                         epoch = float(query["epoch"][0])
                     if "duration" in query and query["duration"][0]:
                         duration = float(query["duration"][0])
+                    if "depth" in query and query["depth"][0]:
+                        depth = float(query["depth"][0])
                 except Exception:
                     pass
 
@@ -339,6 +354,7 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                     period=period,
                     epoch=epoch,
                     duration=duration,
+                    depth=depth,
                 )
                 payload["upload_audit"] = audit_result
                 self._send_json_success(payload)
@@ -358,6 +374,7 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
         period: Optional[float] = None,
         epoch: Optional[float] = None,
         duration: Optional[float] = None,
+        depth: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Run complete vetting pipeline strictly with real observed data."""
         res = vet_and_generate_report(
@@ -367,6 +384,7 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
             period=period,
             epoch=epoch,
             duration=duration,
+            depth=depth,
             search_periods=True,
             synthetic_fixture_ok=False,
             allow_synthetic=False,

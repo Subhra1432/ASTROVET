@@ -80,6 +80,7 @@ class AstrovetFusionModel:
         inst.provenance = provenance
         return inst
 
+
     def build_feature_vector(
         self,
         baseline_pred: Optional[BaselinePrediction],
@@ -356,4 +357,37 @@ class AstrovetFusionModel:
             is_synthetic=is_synth,
             model_version="astrovet_0.1.0",
             run_id=run_id,
+        )
+
+
+def validate_ssl_checkpoint_compatibility(
+    fusion_model: AstrovetFusionModel,
+    encoder_mode: str,
+    ssl_checkpoint: Optional[str | Path],
+) -> None:
+    """Fail closed when an SSL-fusion model is paired with a different encoder."""
+    expected_sha256 = (fusion_model.provenance or {}).get("ssl_checkpoint_sha256")
+    if not expected_sha256:
+        return
+    if encoder_mode != "ssl":
+        raise ValueError(
+            "The selected fusion model was trained with a self-supervised encoder; "
+            "use --encoder-mode ssl with its matching checkpoint."
+        )
+    if ssl_checkpoint is None:
+        raise ValueError(
+            "The selected fusion model requires its matching SSL checkpoint, but none was supplied. "
+            "Set ASTROVET_SSL_CHECKPOINT or pass --ssl-checkpoint."
+        )
+    from astrovet.provenance import compute_sha256
+
+    checkpoint_path = Path(ssl_checkpoint)
+    if not checkpoint_path.is_file():
+        raise FileNotFoundError(f"SSL checkpoint does not exist: {checkpoint_path}")
+    actual_sha256 = compute_sha256(checkpoint_path)
+    if actual_sha256.lower() != str(expected_sha256).lower():
+        raise ValueError(
+            "The SSL checkpoint does not match the selected fusion model. "
+            f"Expected SHA-256 {expected_sha256}, got {actual_sha256}. "
+            "Use the encoder checkpoint that was used to train this fusion artifact."
         )

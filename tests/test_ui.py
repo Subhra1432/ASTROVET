@@ -51,6 +51,7 @@ class TestDashboardUI(unittest.TestCase):
             self.assertIn('id="candidateIdInput" value=""', content)
             self.assertIn('id="fitsPathInput" value=""', content)
             self.assertIn('id="retrieveMastCheck"', content)
+            self.assertIn('id="depth"', content)
 
             # Ensure pre-run display shows neutral NOT RUN and N/A placeholders
             self.assertIn('id="triageBadge" class="triage-badge badge-not-run">NOT RUN</span>', content)
@@ -113,6 +114,14 @@ class TestDashboardUI(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 400)
         body = json.loads(ctx.exception.read().decode("utf-8"))
         self.assertIn("finite numeric values", body["error"])
+
+    def test_api_vet_rejects_nonpositive_depth(self):
+        url = f"http://127.0.0.1:{self.port}/api/vet?candidate_id=390651552-1-S23&depth=0"
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(url)
+        self.assertEqual(ctx.exception.code, 400)
+        body = json.loads(ctx.exception.read().decode("utf-8"))
+        self.assertIn("depth must be greater than zero", body["error"])
 
     def test_api_vet_missing_fits_fails_closed(self):
         """Verify request without local FITS or retrieve_mast fails closed without synthetic fallback."""

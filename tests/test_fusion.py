@@ -4,12 +4,39 @@ import numpy as np
 from astrovet.schemas.baseline import BaselinePrediction
 from astrovet.schemas.prediction import PhysicsDiagnostics, TriageState
 from astrovet.schemas.candidate import CandidateRecord, Ephemeris
-from astrovet.models.fusion import AstrovetFusionModel
+from astrovet.models.fusion import AstrovetFusionModel, validate_ssl_checkpoint_compatibility
 from astrovet.models.calibration import PlattCalibrator
 from astrovet.explain.report import generate_candidate_markdown_report
 
 
 class TestFusionAndReport(unittest.TestCase):
+    def test_fusion_rejects_mismatched_or_missing_ssl_checkpoint(self):
+        import hashlib
+        import tempfile
+        from pathlib import Path
+        from types import SimpleNamespace
+
+        checkpoint_bytes = b"trained encoder checkpoint"
+        expected_sha = hashlib.sha256(checkpoint_bytes).hexdigest()
+        fusion = SimpleNamespace(provenance={"ssl_checkpoint_sha256": expected_sha})
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            checkpoint = Path(tmp_dir) / "encoder.npz"
+            checkpoint.write_bytes(checkpoint_bytes)
+            validate_ssl_checkpoint_compatibility(fusion, "ssl", checkpoint)
+
+            with self.assertRaisesRegex(FileNotFoundError, "does not exist"):
+                validate_ssl_checkpoint_compatibility(fusion, "ssl", Path(tmp_dir) / "other.npz")
+
+            checkpoint.write_bytes(b"different encoder")
+            with self.assertRaisesRegex(ValueError, "does not match"):
+                validate_ssl_checkpoint_compatibility(fusion, "ssl", checkpoint)
+
+            with self.assertRaisesRegex(ValueError, "requires its matching SSL checkpoint"):
+                validate_ssl_checkpoint_compatibility(fusion, "ssl", None)
+
+            with self.assertRaisesRegex(ValueError, "trained with a self-supervised encoder"):
+                validate_ssl_checkpoint_compatibility(fusion, "pca", checkpoint)
+
     def test_fusion_prediction_and_triage(self):
         fusion = AstrovetFusionModel()
 
