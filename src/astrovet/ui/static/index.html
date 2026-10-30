@@ -109,6 +109,18 @@
     .step-list li + li { margin-top: 4px; }
     .simple-summary { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; background: var(--bg-surface-elevated); }
     .simple-summary h3 { font-size: 16px; margin-bottom: 6px; }
+    .plain-language-review { border: 1px solid #365174; border-radius: var(--radius-md); padding: 14px 16px; background: linear-gradient(145deg, rgba(30, 58, 88, 0.46), rgba(26, 35, 56, 0.72)); }
+    .plain-language-review > summary { cursor: pointer; color: var(--accent-blue); font-size: 14px; font-weight: 700; }
+    .plain-language-review[open] > summary { margin-bottom: 12px; }
+    .review-lead { border-left: 3px solid var(--warning); padding: 8px 11px; margin-bottom: 12px; background: rgba(245, 158, 11, 0.08); color: var(--text-main); font-size: 13px; }
+    .review-lead strong { display: block; margin-bottom: 3px; }
+    .review-evidence { padding-left: 20px; color: var(--text-main); font-size: 12px; line-height: 1.6; }
+    .review-evidence li + li { margin-top: 5px; }
+    .review-guide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 12px; }
+    .review-guide-card { background: rgba(10, 14, 23, 0.35); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px; }
+    .review-guide-card h4 { font-size: 12px; margin-bottom: 5px; color: var(--text-main); }
+    .review-guide-card p { color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+    .review-next-step { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; line-height: 1.6; }
     details.advanced { border-top: 1px solid var(--border); padding-top: 12px; }
     details.advanced > summary, .technical-details > summary { cursor: pointer; color: var(--accent-blue); font-size: 13px; font-weight: 600; }
     details.advanced[open] > summary { margin-bottom: 12px; }
@@ -440,6 +452,44 @@
           <a id="fullReportLink" href="#" style="display:none; color:var(--accent-blue); font-size:13px; margin-top:10px;">Open the detailed report</a>
         </div>
 
+        <details class="plain-language-review" open>
+          <summary>Detailed review: why the result may be limited</summary>
+          <div class="review-lead" aria-live="polite">
+            <strong id="plainReviewHeading">What this review can tell you</strong>
+            <span id="plainReviewSummary">ASTROVET looks for repeated drops in a star’s brightness and checks whether the pattern resembles previously followed-up candidates. A low score does not prove that a planet is absent.</span>
+          </div>
+          <ul class="review-evidence" id="plainReviewEvidence" aria-live="polite">
+            <li>After analysis, this list will explain which checks were weak, disagreed, or could not run for this file.</li>
+          </ul>
+          <div class="review-guide-grid">
+            <article class="review-guide-card">
+              <h4>1. Did we have enough clean data?</h4>
+              <p>TESS measures a star’s brightness over time. Unreliable readings are removed and gaps are kept visible. If only a small part of the file is usable, the searches have less evidence to work with. Check the retained-reading count and file warnings.</p>
+            </article>
+            <article class="review-guide-card">
+              <h4>2. Did the brightness drop repeat?</h4>
+              <p>Two search methods look for repeating dips. Similar timing supports a repeating signal. Different timings, a weak signal, or too few clean readings make the result uncertain. A repeating signal can still come from something other than a planet.</p>
+            </article>
+            <article class="review-guide-card">
+              <h4>3. Could another star or noise explain it?</h4>
+              <p>An eclipsing pair of stars, stellar activity, or instrument effects can also make dips. Unequal alternating dips or another dip between transits are clues for review, not automatic proof of a false alarm.</p>
+            </article>
+            <article class="review-guide-card">
+              <h4>4. How much planet-label training was available?</h4>
+              <p>The encoder learned brightness patterns from 11,511 light curves without planet labels. The planet-like versus false-positive decision used 1,751 labeled events from targets selected for follow-up; its held-out check used 256 events. This is a small, selected sample compared with all TESS stars.</p>
+            </article>
+            <article class="review-guide-card">
+              <h4>5. What do the scores mean?</h4>
+              <p>The ASTROVET score ranks how closely the measurements match patterns learned from its labeled sample. The follow-up comparison score is calibrated for that selected sample. Neither number is the real-world chance that this star has a planet.</p>
+            </article>
+            <article class="review-guide-card">
+              <h4>6. Why might a comparison say “Not available”?</h4>
+              <p>The NASA comparison needs a matching catalog entry or a successful optional Docker run. The follow-up score needs the matching trained model and enough input measurements. A missing value means no comparison was produced; it is not evidence against a planet.</p>
+            </article>
+          </div>
+          <p class="review-next-step"><strong>What to do next:</strong> open the brightness plot and detailed report, check the file-quality warnings and repeating-dip results, and ask a researcher to review uncertain or conflicting evidence. Only independent observations and scientific validation can establish whether a candidate is a planet.</p>
+        </details>
+
         <details class="technical-details">
           <summary>Show measurements and model scores</summary>
 
@@ -472,14 +522,14 @@
           </div>
 
           <div class="metric-box">
-            <span class="metric-label">ASTROVET research score</span>
+            <span class="metric-label">ASTROVET pattern score</span>
             <span class="metric-value" id="valAstrovetScore">N/A</span>
             <span class="sub-tag" id="valAstrovetMode">Not checked yet</span>
             <span class="metric-note" id="noteAstrovet">Shown on a 0–100 model scale. Higher scores rank as more planet-like for review; not a probability.</span>
           </div>
 
           <div class="metric-box">
-            <span class="metric-label">Comparison with a follow-up sample</span>
+            <span class="metric-label">Score compared with followed-up targets</span>
             <span class="metric-value" id="valCalibratedProb">N/A</span>
             <span class="sub-tag" id="valCalibratedMode">Not checked yet</span>
             <span class="metric-note" id="noteCalibrated">Not the chance that this object is a planet.</span>
@@ -880,6 +930,67 @@
         triageExplanation.innerText = 'The checks may disagree, the data may be incomplete, or the model may be uncertain. Review the measurements and light-curve plot before drawing a conclusion.';
         badge.className = 'triage-badge badge-review';
       }
+
+      const reviewHeading = document.getElementById('plainReviewHeading');
+      const reviewSummary = document.getElementById('plainReviewSummary');
+      const reviewEvidence = document.getElementById('plainReviewEvidence');
+      if (decision === 'FALSE_POSITIVE_LIKE') {
+        reviewHeading.innerText = 'Why ASTROVET gave a lower planet-like score';
+        reviewSummary.innerText = 'The available measurements look more like false-positive examples in the model’s labeled sample. This lowers the candidate’s priority for follow-up; it does not prove that there is no planet.';
+      } else if (decision === 'PLANET_LIKE') {
+        reviewHeading.innerText = 'Why ASTROVET marked this candidate for a closer look';
+        reviewSummary.innerText = 'The available measurements look more like planet-like examples in the model’s labeled sample. This is a reason to review the candidate, not a confirmation.';
+      } else {
+        reviewHeading.innerText = 'Why ASTROVET could not make a clear call';
+        reviewSummary.innerText = 'Some checks may be weak, may disagree, or may not have enough data. The specific clues from this file are listed below. An uncertain result does not mean the candidate is not a planet.';
+      }
+
+      const reviewLines = [];
+      const addReviewLine = message => { if (message && !reviewLines.includes(message)) reviewLines.push(message); };
+      const audit = data.upload_audit || {};
+      const cadenceAudit = audit.cadence_audit || {};
+      if (cadenceAudit.raw_total_cadences) {
+        addReviewLine(`Data retained: ${cadenceAudit.usable_cadences || 0} of ${cadenceAudit.raw_total_cadences} brightness readings (${cadenceAudit.retention_percentage || 0}%). Removed or missing readings leave less information for the searches.`);
+      }
+      const periodSearch = data.periodogram || {};
+      const blsResult = periodSearch.bls || {};
+      const tlsResult = periodSearch.tls || {};
+      if (blsResult.is_available && tlsResult.is_available) {
+        addReviewLine(periodSearch.period_agreement
+          ? 'The two repeating-dip searches found similar timing. This supports a repeating signal, but does not tell us what caused it.'
+          : 'The two repeating-dip searches chose different timing. That disagreement makes the pattern harder to interpret and calls for human review.');
+      } else {
+        const unavailableSearches = [!blsResult.is_available ? 'one search for box-shaped dips' : '', !tlsResult.is_available ? 'one search for planet-shaped dips' : ''].filter(Boolean).join(' and ');
+        addReviewLine(`${unavailableSearches || 'A repeating-dip search'} could not provide a result. This can happen when there are too few clean readings or the search cannot run; it is not a negative planet finding.`);
+      }
+      const diagnostics = data.diagnostics || {};
+      if (diagnostics.odd_even_consistent === false) addReviewLine('Alternating dips have different depths. This can happen when two stars eclipse each other, so the pattern needs review.');
+      if (diagnostics.secondary_eclipse_detected === true) addReviewLine('Another dip was found between the main dips. That can be a clue for an eclipsing pair of stars, but it needs human review.');
+      if (diagnostics.odd_even_consistent === true) addReviewLine('Alternating dips have similar depths. That is compatible with a planet transit, but it does not confirm one.');
+      if (diagnostics.secondary_eclipse_detected === false) addReviewLine('No second dip was detected at the searched location. Not finding one does not rule out other explanations.');
+      if (scoreExplanation.top_contributions && scoreExplanation.top_contributions.length) {
+        scoreExplanation.top_contributions.filter(item => Number(item.logit_contribution) < 0).slice(0, 3).forEach(item => {
+          addReviewLine(`${featureName(item.feature)} lowered the model score compared with its learned examples.`);
+        });
+      }
+      if ((data.baseline_score === null || data.baseline_score === undefined) && data.baseline_message) {
+        addReviewLine(`NASA comparison unavailable: ${data.baseline_message} A missing comparison is not evidence against a planet.`);
+      }
+      if (!data.is_calibrated || data.calibrated_planet_like_probability === null) {
+        addReviewLine('The followed-up-target comparison score was not produced for this run. This means that comparison is unavailable, not that the candidate scored zero.');
+      }
+      if (data.predictive_uncertainty !== null && data.predictive_uncertainty !== undefined && data.predictive_uncertainty >= 0.3) {
+        addReviewLine('The model reports higher uncertainty for this result. Give more weight to the measurements and human review than to the score.');
+      }
+      if (data.score_type !== 'fitted_fusion_score') {
+        addReviewLine('The trained planet-vetting model was not used. This result is a simpler rule-based estimate and should be treated with extra caution.');
+      }
+      if (!reviewLines.length) addReviewLine('No major warning was detected in the available checks. The result still needs human review because other stars and instrumental effects can imitate planet transits.');
+      reviewEvidence.replaceChildren(...reviewLines.map(message => {
+        const item = document.createElement('li');
+        item.innerText = message;
+        return item;
+      }));
 
       // Physics table
       const diag = data.diagnostics || {};
