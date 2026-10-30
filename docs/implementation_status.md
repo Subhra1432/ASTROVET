@@ -1,6 +1,6 @@
 # ASTROVET Implementation Status
 
-Last audited: 2026-10-29
+Last audited: 2026-10-30
 
 ## Operational in this checkout
 
@@ -22,6 +22,7 @@ Last audited: 2026-10-29
 - **Self-supervised input stability:** Folded light-curve views are robustly centered/scaled regardless of FITS flux units, cadence masks use the normalized baseline, optimizer gradients are clipped, and non-finite model states fail clearly. Directory pretraining records skipped-file reasons in checkpoint provenance.
 - **Real QLP archive:** The downloaded archive is at `D:\Final Year Projet\ASTROVET_data\LC.tar.gz` (MD5 verified) and 11,511 host-filtered FITS products are available in `LC_train_hosts`. The host split manifest contains 11,487 training hosts.
 - **Real-data SSL checkpoint:** `D:\Final Year Projet\ASTROVET_data\artifacts\models\ssl_encoder_real_qlp_trainhosts_v2.npz` was trained on 97,857 views extracted from 1,000 deterministic QLP FITS files restricted to training hosts. No files were skipped. Joint loss decreased from `1.296555` to `0.707230` over five epochs; reconstruction loss decreased from `1.232723` to `0.698956` and view-consistency loss from `0.127663` to `0.016548`. The artifact is a representation encoder, not a classifier.
+- **Full QLP train-host SSL run (2026-10-30):** Completed five CPU epochs on all 11,511 files in `LC_train_hosts` (11,487 unique training hosts), producing 1,171,623 views; 0 files were skipped. Final total loss was `0.760074` (epoch 1: `0.765910`). The checkpoint is `D:\Final Year Projet\ASTROVET_data\artifacts\models\ssl_encoder_all_qlp_trainhosts_20261030.npz`. A matching fusion head was trained on 1,751 usable labeled events. Twenty validation/calibration/test hosts seen in unlabeled SSL pretraining were removed from the labeled cohort before downstream fitting, leaving those held-out partitions host-disjoint from pretraining. The updated held-out results are ROC-AUC `0.8039`, PR-AUC `0.8377` on 256 events / 251 hosts. See the updated [model card](model_card.md) and launcher `scripts/start_dashboard_with_all_qlp_model.ps1`.
 - **Dashboard encoder integration:** The upload-and-vet endpoint automatically discovers the project-local real-data checkpoint or accepts `ASTROVET_SSL_CHECKPOINT`; the dashboard reports whether the SSL representation was actually used and displays a per-score explanation.
 - **Real-data end-to-end inference:** `D:\Final Year Projet\ASTROVET_data\artifacts\reports\real_qlp_case_183978641_with_periodograms\183978641-1-S39_report.md` and its plot were generated from an observed QLP FITS file. TLS recovered the supplied 10.029754-day ephemeris (0.01% difference), while BLS selected a different period (29.02% difference); ASTROVET correctly exposes this as `PERIODICITY_MISMATCH` and `BLS_TLS_PERIOD_DISAGREEMENT` and routes the candidate to `REVIEW_REQUIRED`.
 
@@ -34,13 +35,21 @@ Last audited: 2026-10-29
 - **Brier Score:** Reduced from `0.1417` (raw) to `0.0825` (calibrated).
 - **Precision / Recall / F1:** Precision `0.6069`, Recall `0.4077`, F1 `0.4877` (at default decision threshold 0.50).
 
+## Remaining Work
+
+- [ ] Exercise the new-model dashboard at `http://127.0.0.1:8082` with multiple real SPOC and QLP FITS files. Compare browser output, CLI output, explanations, plots, and saved reports; verify the follow-up-sample score appears when the fitted model and required candidate measurements are available.
+- [ ] Run a broader transit injection-and-recovery grid across periods, durations, depths, noise, gaps, cadence, sectors, and both SPOC/QLP pipelines. Existing depth-preservation evidence covers only two real files and one injection per file.
+- [ ] Validate on a blinded, disposition-labeled cohort outside the selected TOI follow-up sample; freeze the model and threshold first. Report confidence intervals, subgroup performance, precision/recall at the intended review operating point, calibration, and abstention coverage.
+- [ ] Rerun the repository test suite after the latest model/dashboard integration before a release.
+- [ ] If live ExoMiner execution is required, restart Docker Desktop and use a machine/container with enough memory. Catalog scores remain available only where a matching reference entry exists.
+
 ## Remaining Boundaries & Limitations
 
 - **Target meaning:** E is a periodic eclipsing signal label and includes planet transits as well as non-contact eclipsing binaries. The trained E-versus-B/J score does not identify planets and must not be displayed as a planet probability.
 - **Catalog-only scope:** The trained classifier uses tabular transit/stellar parameters (`Period`, `Duration`, `Depth`, `SMass`, `SRad`, `Tmag`, etc.) only. It is a baseline, not the hybrid model; its artifact is blocked from fusion inference to prevent misuse.
 - **SSL scope:** Self-supervised pretraining learns representations from unlabeled TESS curves. It does not, by itself, learn a planet/non-planet decision boundary. The real-data encoder checkpoint is a validated training artifact for software integration, but its scientific utility requires downstream labeled evaluation.
 - **Hybrid inference boundary:** An SSL-plus-physics decision head is now trained from the matched raw-FITS labeled cohort and can be explicitly enabled for upload inference. It is trained on a small, selected TOI follow-up sample and must be treated as a research candidate-prioritization score. Broader independent host/sector/pipeline validation and decision-threshold/abstention review are still needed before population-level or autonomous disposition claims. The separate E-vs-B/J classifier remains a different task and stays blocked from planet-vetting inference.
-- **Upstream Containerized Baseline:** The untouched NASA ExoMiner source checkout and its prediction catalog are present beside ASTROVET at `D:\Final Year Projet\ExoMiner-main\ExoMiner-main`; default adapter/report discovery uses that catalog. Live NASA pipeline execution follows the official container interface but requires Docker/Podman daemon. Docker CLI is installed on the audited machine, but its daemon was unavailable during this audit, so live container execution was not verified.
+- **Upstream Containerized Baseline:** The untouched NASA ExoMiner source checkout and its prediction catalog are present beside ASTROVET at `D:\Final Year Projet\ExoMiner-main\ExoMiner-main`; default adapter/report discovery uses that catalog. Live NASA pipeline execution follows the official container interface but requires a running Docker/Podman daemon and substantial memory. The latest daemon check could not connect to Docker Desktop; a previous live container attempt returned an out-of-memory failure. The container also disables GPU use.
 - **Long-Period & Shallow Candidates:** Subgroup evaluation shows reduced PR-AUC for long periods ($P \ge 15$ d: PR-AUC 0.1296) and shallow depths ($<500$ ppm: PR-AUC 0.1782) due to lower signal-to-noise ratio and extreme class imbalance.
 
 ## Authoritative Data and Baseline References
