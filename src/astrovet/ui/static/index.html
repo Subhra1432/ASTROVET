@@ -120,6 +120,9 @@
     .review-guide-card { background: rgba(10, 14, 23, 0.35); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px; }
     .review-guide-card h4 { font-size: 12px; margin-bottom: 5px; color: var(--text-main); }
     .review-guide-card p { color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+    .review-quick { margin-top: 9px; padding: 9px 11px; border-left: 3px solid var(--accent-blue); background: rgba(56, 189, 248, 0.06); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; color: var(--text-main); font-size: 12px; line-height: 1.5; }
+    .uncertainty-inline { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 11px; }
+    .uncertainty-inline strong { color: var(--text-main); margin-left: 4px; }
     .review-next-step { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; line-height: 1.6; }
     details.advanced { border-top: 1px solid var(--border); padding-top: 12px; }
     details.advanced > summary, .technical-details > summary { cursor: pointer; color: var(--accent-blue); font-size: 13px; font-weight: 600; }
@@ -130,7 +133,7 @@
     @media (max-width: 900px) {
       .layout-grid { grid-template-columns: 1fr; }
     }
-    @media (max-width: 600px) { body { padding: 14px; } header { align-items: flex-start; } .brand-title h1 { font-size: 19px; } }
+    @media (max-width: 600px) { body { padding: 14px; } header { align-items: flex-start; } .brand-title h1 { font-size: 19px; } .score-grid { grid-template-columns: 1fr; } }
 
     .card {
       background: var(--bg-surface);
@@ -235,15 +238,15 @@
 
     .score-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
     }
 
     .metric-box {
       background: var(--bg-surface-elevated);
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
-      padding: 16px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -449,11 +452,34 @@
         <div class="simple-summary" aria-live="polite">
           <h3 id="summaryHeading">Your result will appear here</h3>
           <p id="triageExplanation" class="summary-note">Upload a TESS light curve and choose Analyze light curve to begin. ASTROVET helps prioritize candidates; it cannot confirm a planet.</p>
+          <p id="plainReviewQuick" class="review-quick" style="display:none;"></p>
           <a id="fullReportLink" href="#" style="display:none; color:var(--accent-blue); font-size:13px; margin-top:10px;">Open the detailed report</a>
         </div>
 
-        <details class="plain-language-review" open>
-          <summary>Detailed review: why the result may be limited</summary>
+        <div class="score-grid">
+          <div class="metric-box">
+            <span class="metric-label">NASA ExoMiner comparison</span>
+            <span class="metric-value" id="valBaselineScore">Not run</span>
+            <span class="sub-tag" id="valBaselineMode">Optional comparison</span>
+            <span class="metric-note" id="noteBaseline">A NASA reference score may be unavailable for this target. Missing is not a negative finding.</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">ASTROVET pattern score</span>
+            <span class="metric-value" id="valAstrovetScore">Not run</span>
+            <span class="sub-tag" id="valAstrovetMode">Waiting for analysis</span>
+            <span class="metric-note" id="noteAstrovet">A 0–100 ranking from the model; it is not a planet probability.</span>
+            <div class="uncertainty-inline">Model uncertainty: <strong id="valUncertainty">Not measured</strong> <span id="valUncertaintyMode">Waiting for analysis</span><br><span id="noteUncertainty">Uncertainty will appear after analysis.</span></div>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Compared with followed-up targets</span>
+            <span class="metric-value" id="valCalibratedProb">Not run</span>
+            <span class="sub-tag" id="valCalibratedMode">Waiting for analysis</span>
+            <span class="metric-note" id="noteCalibrated">This comparison is based on a selected research sample, not all stars.</span>
+          </div>
+        </div>
+
+        <details class="plain-language-review">
+          <summary>See the detailed explanation and what to do next</summary>
           <div class="review-lead" aria-live="polite">
             <strong id="plainReviewHeading">What this review can tell you</strong>
             <span id="plainReviewSummary">ASTROVET looks for repeated drops in a star’s brightness and checks whether the pattern resembles previously followed-up candidates. A low score does not prove that a planet is absent.</span>
@@ -491,7 +517,7 @@
         </details>
 
         <details class="technical-details">
-          <summary>Show measurements and model scores</summary>
+          <summary>Show data quality, measurements and plots</summary>
 
         <!-- Upload Audit Banner (Shown when a file is uploaded) -->
         <div id="uploadAuditPanel" class="audit-card" style="display:none;">
@@ -511,36 +537,6 @@
           </div>
 
           <div id="auditWarnings" style="color:#fca5a5; margin-top:4px; font-size:11px;"></div>
-        </div>
-
-        <div class="score-grid">
-          <div class="metric-box">
-            <span class="metric-label">ExoMiner comparison score</span>
-            <span class="metric-value" id="valBaselineScore">N/A</span>
-            <span class="sub-tag" id="valBaselineMode">Not checked yet</span>
-            <span class="metric-note" id="noteBaseline">Higher scores mean the NASA model found a more planet-like pattern. This is one model’s score, not proof.</span>
-          </div>
-
-          <div class="metric-box">
-            <span class="metric-label">ASTROVET pattern score</span>
-            <span class="metric-value" id="valAstrovetScore">N/A</span>
-            <span class="sub-tag" id="valAstrovetMode">Not checked yet</span>
-            <span class="metric-note" id="noteAstrovet">Shown on a 0–100 model scale. Higher scores rank as more planet-like for review; not a probability.</span>
-          </div>
-
-          <div class="metric-box">
-            <span class="metric-label">Score compared with followed-up targets</span>
-            <span class="metric-value" id="valCalibratedProb">N/A</span>
-            <span class="sub-tag" id="valCalibratedMode">Not checked yet</span>
-            <span class="metric-note" id="noteCalibrated">Not the chance that this object is a planet.</span>
-          </div>
-
-          <div class="metric-box">
-            <span class="metric-label">How much the model is unsure</span>
-            <span class="metric-value" id="valUncertainty">N/A</span>
-            <span class="sub-tag" id="valUncertaintyMode">Not checked yet</span>
-            <span class="metric-note" id="noteUncertainty">Awaiting candidate vetting run</span>
-          </div>
         </div>
 
         <div class="audit-card" style="margin: 10px 0;">
@@ -991,6 +987,17 @@
         item.innerText = message;
         return item;
       }));
+      const quickClues = reviewLines.filter(message => /different timing|different depths|another dip|lowered the model score|higher uncertainty|could not provide a result/i.test(message));
+      const quickMessage = quickClues.length
+        ? quickClues.slice(0, 2).join(' ')
+        : (decision === 'FALSE_POSITIVE_LIKE'
+          ? 'The model found a weaker match to the planet-like examples in its training sample. See the detailed review for the measurements it used.'
+          : decision === 'PLANET_LIKE'
+            ? 'The checks support a closer look, but no single score or measurement confirms a planet.'
+            : 'No single check gives a clear answer. Open the detailed review for the measurements and any missing comparisons.');
+      const quickReview = document.getElementById('plainReviewQuick');
+      quickReview.innerText = `${quickClues.length > 1 ? 'Main clues' : 'Main clue'}: ${quickMessage}`;
+      quickReview.style.display = 'block';
 
       // Physics table
       const diag = data.diagnostics || {};
