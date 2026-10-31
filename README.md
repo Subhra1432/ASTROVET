@@ -72,6 +72,8 @@ python -m astrovet.cli ui --port 8080
 
 Open <http://127.0.0.1:8080/> and upload a TESS SPOC or QLP `.fits` / `.fits.gz` light curve. The upload workflow checks the file, records a checksum and cadence audit, and runs the available vetting steps. Uploaded originals are stored under `data/uploads/`, which is ignored by Git. See [the upload guide](docs/upload_workflow.md) for accepted inputs, limits, and details.
 
+After analysis, the dashboard can show a downloadable two-panel light-curve chart. It also looks up a matching 11 × 11 TESS pixel cutout from MAST using the candidate's TIC and sector, then displays a median view of the quality-clear pixels. Pixel cutouts are cached locally in `data/pixel_cutouts/` and are not committed to Git. The pixel view is supplemental context; the uploaded light curve is still used for transit analysis. If MAST has no cutout or is unreachable, candidate vetting still completes without the pixel image. See the [TESSCut guide](https://astroquery.readthedocs.io/en/stable/mast/mast_cut.html).
+
 ## Command-line workflows
 
 ### Fetch an observed TESS light curve from MAST
