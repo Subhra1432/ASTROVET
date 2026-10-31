@@ -6,6 +6,8 @@ ASTROVET provides a secure, single-action upload and vetting workflow for TESS l
 
 The workflow executes end-to-end scientific validation and transit vetting while strictly preserving uploaded data unchanged and preventing remote code execution or filesystem traversal.
 
+After vetting, the dashboard also tries to fetch a matching 11 × 11 TESS pixel cutout from MAST TESSCut using the candidate TIC and sector. It caches the FITS cutout under `data/pixel_cutouts/` and saves a median, quality-filtered pixel preview as `artifacts/reports/<candidate_id>_pixel_view.png`. This spatial view is supplemental; the uploaded light-curve FITS remains the input for transit searching. If MAST has no cutout or cannot be reached, vetting still completes and the dashboard reports that the pixel view is unavailable. See the [MAST TESS data products](https://archive.stsci.edu/missions-and-data/tess/data-products) and [TESSCut guide](https://astroquery.readthedocs.io/en/stable/mast/mast_cut.html).
+
 ---
 
 ## 1. Security Architecture & Ingestion Guardrails

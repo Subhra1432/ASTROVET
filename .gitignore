@@ -17,6 +17,7 @@ data/raw/
 data/interim/
 data/processed/
 data/checkpoints/
+data/pixel_cutouts/
 data/container_runs/
 data/manifests/*.json
 data/uploads/

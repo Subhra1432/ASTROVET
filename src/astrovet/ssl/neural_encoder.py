@@ -20,7 +20,7 @@ Scientific principles:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from astrovet.ssl.augmentations import random_cadence_mask, bounded_photometric_jitter

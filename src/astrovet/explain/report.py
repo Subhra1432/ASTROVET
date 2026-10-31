@@ -236,7 +236,7 @@ def vet_and_generate_report(
     from astrovet.baseline.adapter import ExoMinerBaselineAdapter
     from astrovet.ssl.encoder import LightCurvePCAPrototypeEncoder
     from astrovet.models.fusion import AstrovetFusionModel
-    from astrovet.explain.plots import generate_candidate_diagnostic_plot
+    from astrovet.explain.plots import generate_candidate_diagnostic_plot, generate_lightcurve_explainer_plot
     from astrovet.schemas.candidate import CandidateRecord, Ephemeris
     from astrovet.baseline.adapter import find_default_catalog_path
 
@@ -532,6 +532,14 @@ def vet_and_generate_report(
         periodogram_results=periodogram_res,
         candidate_period=resolved_period,
     )
+    lightcurve_plot_file = out_dir / f"{req_candidate_id}_lightcurve.png"
+    generate_lightcurve_explainer_plot(
+        time=norm_lc.time,
+        flux=norm_lc.flux_detrended,
+        folded_view=primary_zoom,
+        fit_res=fit_res,
+        output_path=lightcurve_plot_file,
+    )
 
     # 10. Markdown Vetting Report
     cand_rec = CandidateRecord(
@@ -561,6 +569,7 @@ def vet_and_generate_report(
         "prediction": pred,
         "report_file": report_file,
         "plot_file": plot_file,
+        "lightcurve_plot_file": lightcurve_plot_file,
         "periodogram_results": periodogram_res,
     }
 

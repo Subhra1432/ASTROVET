@@ -16,6 +16,68 @@ from astrovet.views.folding import FoldedView
 from astrovet.physics.transit_model import ApproximateTransitFitResult
 
 
+def generate_lightcurve_explainer_plot(
+    time: np.ndarray,
+    flux: np.ndarray,
+    folded_view: Optional[FoldedView],
+    fit_res: ApproximateTransitFitResult,
+    output_path: str | Path,
+) -> Path:
+    """Create a compact, plain-language image from processed FITS measurements."""
+    out_p = Path(output_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+    fig, (ax_time, ax_folded) = plt.subplots(1, 2, figsize=(12, 4.2), dpi=150)
+
+    time = np.asarray(time)
+    flux = np.asarray(flux)
+    valid_time = np.isfinite(time) & np.isfinite(flux)
+    if np.any(valid_time):
+        stride = max(1, int(valid_time.sum()) // 3000)
+        ax_time.scatter(time[valid_time][::stride], flux[valid_time][::stride], s=5, alpha=0.55, color="#2563a6")
+        ax_time.set_title("Star brightness during the observation")
+        ax_time.set_xlabel("TESS time (days)")
+        ax_time.set_ylabel("Relative brightness")
+        ax_time.text(
+            0.02, 0.04, "Lower points mean the star looked dimmer.",
+            transform=ax_time.transAxes, fontsize=8, color="#334155",
+        )
+        ax_time.grid(True, alpha=0.2)
+    else:
+        ax_time.text(0.5, 0.5, "No usable brightness measurements", ha="center", va="center")
+        ax_time.set_axis_off()
+
+    if folded_view is None:
+        ax_folded.text(0.5, 0.5, "No reliable repeating period was available, so these measurements could not be lined up around a transit.", ha="center", va="center", wrap=True)
+        ax_folded.set_title("Repeating transit view unavailable")
+        ax_folded.set_axis_off()
+    else:
+        folded_valid = np.asarray(folded_view.valid_mask, dtype=bool)
+        phase = np.asarray(folded_view.phase_in_hours)
+        folded_flux = np.asarray(folded_view.flux)
+        folded_valid &= np.isfinite(phase) & np.isfinite(folded_flux)
+        if np.any(folded_valid):
+            ax_folded.scatter(phase[folded_valid], folded_flux[folded_valid], s=9, alpha=0.55, color="#2563a6", label="Measurements")
+            if fit_res.is_converged:
+                model = np.asarray(fit_res.model_flux)
+                model_valid = np.isfinite(phase) & np.isfinite(model)
+                order = np.argsort(phase[model_valid])
+                ax_folded.plot(phase[model_valid][order], model[model_valid][order], color="#dc2626", linewidth=1.7, label="Approximate dip shape")
+            ax_folded.set_title("Measurements lined up around the possible transit")
+            ax_folded.set_xlabel("Hours from the possible transit")
+            ax_folded.set_ylabel("Change from normal brightness")
+            ax_folded.legend(fontsize=8)
+            ax_folded.grid(True, alpha=0.2)
+        else:
+            ax_folded.text(0.5, 0.5, "A repeating transit pattern was not available to plot", ha="center", va="center", wrap=True)
+            ax_folded.set_axis_off()
+
+    fig.suptitle("A visual summary of the uploaded TESS light curve", fontsize=13, fontweight="bold")
+    fig.tight_layout()
+    fig.savefig(out_p, bbox_inches="tight")
+    plt.close(fig)
+    return out_p
+
+
 def generate_candidate_diagnostic_plot(
     candidate_id: str,
     time: np.ndarray,

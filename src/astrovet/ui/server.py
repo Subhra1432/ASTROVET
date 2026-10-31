@@ -25,6 +25,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from astrovet.baseline.adapter import ExoMinerBaselineAdapter
 from astrovet.explain.report import vet_and_generate_report
+from astrovet.explain.pixel_preview import get_tess_cutout, render_tess_pixel_preview
 from astrovet.ids import parse_candidate_string, make_canonical_candidate_id, resolve_candidate_identity
 from astrovet.lightcurves.validator import (
     store_uploaded_lightcurve,
@@ -435,6 +436,34 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
         pdiag = pred.physics_diagnostics
         pgram = getattr(pred, "periodogram_diagnostics", None) or pdiag.periodogram_summary or {}
 
+        pixel_image_url = None
+        pixel_image_message = "Pixel image has not been loaded."
+        candidate = res["candidate"]
+        try:
+            sector_value = str(candidate.sector_run).strip().upper().removeprefix("S").split("-")[0]
+            sector_number = int(sector_value)
+            cutout_path = get_tess_cutout(
+                tic_id=candidate.tic_id,
+                sector=sector_number,
+                cache_dir=PROJECT_ROOT / "data" / "pixel_cutouts",
+            )
+            pixel_path = PROJECT_ROOT / "artifacts" / "reports" / f"{pred.candidate_id}_pixel_view.png"
+            pixel_info = render_tess_pixel_preview(
+                cutout_path=cutout_path,
+                output_path=pixel_path,
+                tic_id=candidate.tic_id,
+                sector=sector_number,
+            )
+            pixel_image_url = f"/artifacts/reports/{pixel_path.name}"
+            cadence_label = "quality-clear frames" if pixel_info["used_quality_clear"] else "available frames"
+            pixel_image_message = (
+                f"TESS pixel view: median of {pixel_info['cadences_used']:,} {cadence_label}, "
+                f"{pixel_info['pixel_shape'][1]} × {pixel_info['pixel_shape'][0]} pixels."
+            )
+        except Exception as exc:
+            print(f"[ASTROVET] TESS pixel preview unavailable: {exc}")
+            pixel_image_message = "No matching TESS pixel image could be loaded. The light-curve result is still available."
+
         return {
             "candidate_id": pred.candidate_id,
             "baseline_score": pred.baseline_score,
@@ -457,6 +486,9 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                 if is_synthetic else "Real observed TESS light-curve product; source and cadence are shown in the ingestion audit."
             ),
             "fits_file_used": str(fits_file),
+            "lightcurve_plot_url": f"/artifacts/reports/{pred.candidate_id}_lightcurve.png",
+            "pixel_image_url": pixel_image_url,
+            "pixel_image_message": pixel_image_message,
             "plot_url": f"/artifacts/reports/{pred.candidate_id}_diagnostics.png",
             "report_url": f"/artifacts/reports/{pred.candidate_id}_report.md",
             "diagnostics": pred.physics_diagnostics.model_dump(),

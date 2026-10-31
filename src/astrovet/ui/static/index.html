@@ -478,6 +478,25 @@
           </div>
         </div>
 
+        <section id="lightcurveVisualCard" aria-live="polite" style="display:none; margin:16px 0; padding:14px; border:1px solid var(--border-color, #d7dee8); border-radius:12px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <h3 style="margin:0; font-size:15px;">See the light curve as a picture</h3>
+            <a id="lightcurveDownload" href="#" download style="color:var(--accent-blue); font-size:13px;">Download chart</a>
+          </div>
+          <p class="helper-text" style="margin:6px 0 10px;">These charts are made from the FITS brightness measurements. The first shows brightness over time; the second lines measurements up around the possible repeating dip. Lower points mean the star looked dimmer. A dip alone does not prove there is a planet.</p>
+          <img id="lightcurveVisual" src="" alt="Two plots made from the uploaded TESS FITS light curve: brightness over time and measurements lined up around a possible transit." style="display:block; width:100%; height:auto; border-radius:8px; background:#fff;">
+        </section>
+
+        <section id="pixelImageCard" aria-live="polite" style="display:none; margin:16px 0; padding:14px; border:1px solid var(--border-color, #d7dee8); border-radius:12px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <h3 style="margin:0; font-size:15px;">What TESS saw around this star</h3>
+            <a id="pixelImageDownload" href="#" download style="display:none; color:var(--accent-blue); font-size:13px;">Download pixel image</a>
+          </div>
+          <p id="pixelImageMessage" class="helper-text" style="margin:6px 0 10px;">Looking for matching TESS pixel data…</p>
+          <p class="helper-text" style="margin:0 0 10px;">Each square is one detector pixel; brighter colors mean more measured light. This small camera cutout complements the light-curve chart and does not show a planet directly.</p>
+          <img id="pixelImagePreview" src="" alt="Median TESS image cutout showing pixel brightness around the target star." style="display:none; width:min(100%, 680px); height:auto; border-radius:8px; background:#fff;">
+        </section>
+
         <details class="plain-language-review">
           <summary>See the detailed explanation and what to do next</summary>
           <div class="review-lead" aria-live="polite">
@@ -1041,6 +1060,32 @@
         plotImg.src = `${data.plot_url}?t=${new Date().getTime()}`;
         plotImg.style.display = 'block';
         plotPlaceholder.style.display = 'none';
+      }
+
+      if (data.lightcurve_plot_url) {
+        const lightcurveImage = document.getElementById('lightcurveVisual');
+        const lightcurveCard = document.getElementById('lightcurveVisualCard');
+        const lightcurveUrl = `${data.lightcurve_plot_url}?t=${new Date().getTime()}`;
+        lightcurveImage.src = lightcurveUrl;
+        document.getElementById('lightcurveDownload').href = data.lightcurve_plot_url;
+        lightcurveCard.style.display = 'block';
+      }
+
+      const pixelImageCard = document.getElementById('pixelImageCard');
+      const pixelImageMessage = document.getElementById('pixelImageMessage');
+      const pixelImage = document.getElementById('pixelImagePreview');
+      const pixelDownload = document.getElementById('pixelImageDownload');
+      pixelImageCard.style.display = 'block';
+      pixelImageMessage.innerText = data.pixel_image_message || 'No matching TESS pixel image is available for this target and sector.';
+      if (data.pixel_image_url) {
+        const pixelImageUrl = `${data.pixel_image_url}?t=${new Date().getTime()}`;
+        pixelImage.src = pixelImageUrl;
+        pixelImage.style.display = 'block';
+        pixelDownload.href = data.pixel_image_url;
+        pixelDownload.style.display = 'inline';
+      } else {
+        pixelImage.style.display = 'none';
+        pixelDownload.style.display = 'none';
       }
 
       if (data.periodogram) {
