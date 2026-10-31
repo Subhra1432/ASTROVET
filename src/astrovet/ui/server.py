@@ -26,6 +26,7 @@ from typing import Any, Dict, Optional, Tuple
 from astrovet.baseline.adapter import ExoMinerBaselineAdapter
 from astrovet.explain.report import vet_and_generate_report
 from astrovet.explain.pixel_preview import get_tess_cutout, render_tess_pixel_preview
+from astrovet.explain.groq_explainer import generate_groq_explanation
 from astrovet.ids import parse_candidate_string, make_canonical_candidate_id, resolve_candidate_identity
 from astrovet.lightcurves.validator import (
     store_uploaded_lightcurve,
@@ -436,6 +437,37 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
         pdiag = pred.physics_diagnostics
         pgram = getattr(pred, "periodogram_diagnostics", None) or pdiag.periodogram_summary or {}
 
+        # Groq is an optional explanation layer. Send only coarse, identifier-free
+        # review facts; the scientific score and triage decision remain local.
+        groq_explanation = None
+        if is_synthetic:
+            groq_explanation_status = "AI explanation is disabled for synthetic data."
+        else:
+            physics = pdiag.model_dump()
+            groq_summary = {
+                "review_decision": pred.triage_state.value,
+                "score_type": str(pred.score_type),
+                "calibration_available": bool(pred.is_calibrated),
+                "uncertainty_available": pred.predictive_uncertainty is not None,
+                "uncertainty_level": (
+                    "higher" if pred.predictive_uncertainty is not None and pred.predictive_uncertainty >= 0.3
+                    else "lower" if pred.predictive_uncertainty is not None
+                    else "not available"
+                ),
+                "ssl_representation_available": bool(pdiag.modality_availability.get("ssl_representation", False)),
+                "bls_available": bool(pgram.get("bls", {}).get("is_available", False)),
+                "tls_available": bool(pgram.get("tls", {}).get("is_available", False)),
+                "period_searches_agree": bool(pgram.get("period_agreement", False)),
+                "odd_even_consistent": physics.get("odd_even_consistent"),
+                "secondary_eclipse_detected": physics.get("secondary_eclipse_detected"),
+                "review_flags": [str(reason)[:120] for reason in (pred.reason_codes or [])[:10]],
+            }
+            try:
+                groq_explanation, groq_explanation_status = generate_groq_explanation(groq_summary)
+            except Exception:
+                # Optional AI failures must never fail the science workflow.
+                groq_explanation_status = "AI explanation unavailable. ASTROVET's result is unchanged."
+
         pixel_image_url = None
         pixel_image_message = "Pixel image has not been loaded."
         candidate = res["candidate"]
@@ -479,6 +511,8 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
             "predictive_uncertainty": pred.predictive_uncertainty,
             "ssl_representation_available": bool(pdiag.modality_availability.get("ssl_representation", False)),
             "score_explanation": pred.explanation,
+            "groq_explanation": groq_explanation,
+            "groq_explanation_status": groq_explanation_status,
             "is_synthetic": is_synthetic,
             "synthetic_disclaimer": (
                 "DEMONSTRATION / SYNTHETIC FIXTURE: Scores are generated from a synthetic test fixture. "

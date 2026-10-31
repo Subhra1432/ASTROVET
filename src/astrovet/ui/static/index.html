@@ -565,6 +565,18 @@
           <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">These clues show what influenced the model; they do not prove what caused the signal.</div>
         </div>
 
+        <div class="audit-card" style="margin: 10px 0;">
+          <div style="font-size:12px; font-weight:700; margin-bottom:5px;">Optional Groq AI explanation</div>
+          <div id="groqExplanationStatus" class="helper-text" aria-live="polite">Available when GROQ_API_KEY is configured locally. ASTROVET analysis does not depend on Groq.</div>
+          <div id="groqExplanationContent" style="display:none; font-size:12px; line-height:1.5; margin-top:8px;">
+            <p id="groqExplanationSummary"></p>
+            <ul id="groqExplanationEvidence" style="padding-left:20px;"></ul>
+            <p><strong>Limitations:</strong> <span id="groqExplanationLimitations"></span></p>
+            <p><strong>Suggested next step:</strong> <span id="groqExplanationNextStep"></span></p>
+          </div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">AI-written wording only. It does not change ASTROVET’s score or decision and is not scientific confirmation.</div>
+        </div>
+
         <div>
           <h3 style="font-size: 14px; margin-bottom: 8px;">Checks of the brightness dips</h3>
           <p class="helper-text" style="margin-bottom:8px;">These measurements describe how the dips look. None can confirm a planet by itself.</p>
@@ -924,6 +936,25 @@
       }
       if (scoreExplanation.note && !scoreExplanation.top_contributions) explanationLines.push('These are clues used by the model, not proof of what caused the signal.');
       document.getElementById('scoreExplanation').innerText = explanationLines.join('\n');
+
+      const groqStatus = document.getElementById('groqExplanationStatus');
+      const groqContent = document.getElementById('groqExplanationContent');
+      const groqText = data.groq_explanation;
+      groqStatus.innerText = data.groq_explanation_status || 'Optional AI explanation is unavailable. ASTROVET’s result is unchanged.';
+      if (groqText && typeof groqText === 'object') {
+        document.getElementById('groqExplanationSummary').innerText = groqText.summary || '';
+        document.getElementById('groqExplanationLimitations').innerText = groqText.limitations || '';
+        document.getElementById('groqExplanationNextStep').innerText = groqText.next_step || '';
+        const evidenceList = document.getElementById('groqExplanationEvidence');
+        evidenceList.replaceChildren(...(Array.isArray(groqText.evidence) ? groqText.evidence : []).map(clue => {
+          const item = document.createElement('li');
+          item.innerText = String(clue);
+          return item;
+        }));
+        groqContent.style.display = 'block';
+      } else {
+        groqContent.style.display = 'none';
+      }
 
       const badge = document.getElementById('triageBadge');
       const decision = data.class_or_triage_state;

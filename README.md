@@ -74,6 +74,20 @@ Open <http://127.0.0.1:8080/> and upload a TESS SPOC or QLP `.fits` / `.fits.gz`
 
 After analysis, the dashboard can show a downloadable two-panel light-curve chart. It also looks up a matching 11 × 11 TESS pixel cutout from MAST using the candidate's TIC and sector, then displays a median view of the quality-clear pixels. Pixel cutouts are cached locally in `data/pixel_cutouts/` and are not committed to Git. The pixel view is supplemental context; the uploaded light curve is still used for transit analysis. If MAST has no cutout or is unreachable, candidate vetting still completes without the pixel image. See the [TESSCut guide](https://astroquery.readthedocs.io/en/stable/mast/mast_cut.html).
 
+### Optional Groq AI explanation
+
+The dashboard can optionally ask Groq to rephrase a small, identifier-free summary of an ASTROVET result in plain language. This is an explanation aid only: Groq does not receive the FITS file, candidate/TIC identifier, filename, or raw light-curve measurements, and it cannot change the score or triage decision. If Groq is not configured or is unavailable, normal vetting still completes and the local explanation remains available.
+
+Create a new API key in Groq and configure it in the same PowerShell window used to start ASTROVET (do not paste it into source files, README, or Git):
+
+```powershell
+$env:GROQ_API_KEY = "your-new-groq-api-key"
+# Optional: choose another supported Groq model; default is openai/gpt-oss-20b
+$env:GROQ_MODEL = "openai/gpt-oss-20b"
+```
+
+Restart the dashboard after setting the environment variable. The key is read locally from the environment and is never returned to the browser. Because an API key was shared in chat, revoke that key and create a replacement before use. See [Groq text chat](https://console.groq.com/docs/text-chat), [Groq structured outputs](https://console.groq.com/docs/structured-outputs), and [Groq API reference](https://console.groq.com/docs/api-reference).
+
 ## Command-line workflows
 
 ### Fetch an observed TESS light curve from MAST
