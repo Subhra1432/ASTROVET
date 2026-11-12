@@ -39,3 +39,7 @@ runs/
 .DS_Store
 Thumbs.db
 push_to_git.ps1
+
+# Local presentation / viva docs
+docs/*VIVA*
+docs/*.pdf
