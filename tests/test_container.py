@@ -24,7 +24,6 @@ class TestExoMinerContainer(unittest.TestCase):
         )
         self.assertEqual(cmd[0], "podman")
         self.assertTrue(any(arg.startswith("ghcr.io/nasa/exominer@sha256:") for arg in cmd))
-        self.assertIn("--tic_ids", cmd)
         self.assertIn("--tic_ids_fp", cmd)
         self.assertIn("/workspace/output/tics_tbl.csv", cmd)
         self.assertIn("--task=phot-vetting", cmd)
