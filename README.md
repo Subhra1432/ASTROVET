@@ -1,4 +1,4 @@
-# ASTROVET 🔭
+# ASTROVET
 
 **Explainable, physics-informed TESS transit-candidate vetting and triage**
 
