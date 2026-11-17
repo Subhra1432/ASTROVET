@@ -12,6 +12,7 @@ Scientific safeguards:
 
 from __future__ import annotations
 
+import os
 import warnings
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, Optional, List
@@ -313,9 +314,10 @@ def compute_tls_periodogram(
     candidate_period: Optional[float] = None,
     candidate_epoch: Optional[float] = None,
     candidate_duration: Optional[float] = None,
-    oversampling_factor: int = 3,
-    duration_grid_step: float = 1.1,
+    oversampling_factor: int = 2,
+    duration_grid_step: float = 1.15,
     max_samples: int = 500,
+    use_threads: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Run Transit Least Squares (TLS; Hippke & Heller 2019) on clean light-curve data.
@@ -341,8 +343,16 @@ def compute_tls_periodogram(
     # Constrain search range
     upper_period = max_period_days if max_period_days is not None else min(30.0, max(1.0, t_span / 2.0))
     lower_period = max(0.2, min_period_days)
+    if candidate_period and candidate_period > 0 and max_period_days is None:
+        # If candidate period is provided, focus search around candidate period and harmonics (0.5x, 1x, 2x)
+        lower_period = max(lower_period, candidate_period * 0.45)
+        upper_period = min(upper_period, candidate_period * 2.1)
     if upper_period <= lower_period:
         upper_period = lower_period + 1.0
+
+    if use_threads is None:
+        # Single thread avoids Windows multi-process spawn overhead on typical cadences
+        use_threads = 1 if len(t) < 8000 else min(2, os.cpu_count() or 1)
 
     try:
         with warnings.catch_warnings():
@@ -353,6 +363,7 @@ def compute_tls_periodogram(
                 period_max=upper_period,
                 oversampling_factor=oversampling_factor,
                 duration_grid_step=duration_grid_step,
+                use_threads=use_threads,
                 show_progress_bar=False,
             )
 

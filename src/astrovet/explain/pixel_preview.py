@@ -26,7 +26,10 @@ def get_tess_cutout(tic_id: int, sector: int, cache_dir: str | Path) -> Path:
         return cached_path
 
     from astropy.coordinates import SkyCoord
-    from astroquery.mast import Catalogs, Tesscut
+    from astroquery.mast import Catalogs, Tesscut, conf
+
+    # Prevent long network hangs on MAST queries (default was 600s)
+    conf.timeout = 10
 
     catalog = Catalogs.query_criteria(catalog="TIC", ID=tic_id)
     if len(catalog) == 0:

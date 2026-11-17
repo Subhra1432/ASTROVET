@@ -195,6 +195,48 @@ class ExoMinerContainerRunner:
                 }
             )
 
+        # Check if container image exists locally before invoking long-running run
+        try:
+            inspect_cmd = [self.engine, "image", "inspect", self.image_name]
+            inspect_res = subprocess.run(
+                inspect_cmd,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            if inspect_res.returncode != 0:
+                notice = (
+                    f"Container image '{self.image_name}' is not pulled locally. "
+                    f"Run '{self.engine} pull {self.image_name}' first."
+                )
+                if fallback_adapter:
+                    pred = fallback_adapter.predict_candidate(
+                        candidate_id=candidate_id,
+                        tic_id=tic_id,
+                        planet_num=planet_num,
+                        sector_run=str(sector),
+                    )
+                    pred.raw_output["container_notice"] = notice
+                    pred.raw_output["attempted_command"] = " ".join(cmd)
+                    return pred
+
+                return BaselinePrediction(
+                    candidate_id=candidate_id,
+                    upstream_model=f"ExoMiner++_v1.0.0 (Container: {self.image_name})",
+                    score=None,
+                    status="CONTAINER_IMAGE_MISSING",
+                    execution_mode="CONTAINER_PROCESS",
+                    is_synthetic=False,
+                    raw_output={
+                        "error": notice,
+                        "attempted_command": " ".join(cmd),
+                        "instruction": f"Run '{self.engine} pull {self.image_name}' to download the container image.",
+                    },
+                )
+        except Exception:
+            pass
+
         # Execute container process
         try:
             res = subprocess.run(

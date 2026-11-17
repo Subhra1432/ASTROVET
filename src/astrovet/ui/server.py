@@ -18,7 +18,7 @@ import os
 import math
 import email
 from email.policy import default as email_default_policy
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from typing import Any, Dict, Optional, Tuple
@@ -55,6 +55,7 @@ def resolve_ssl_checkpoint() -> Optional[Path]:
 
 
 class AstrovetDashboardHandler(BaseHTTPRequestHandler):
+    timeout = 30
     def log_message(self, format: str, *args: Any) -> None:
         # Keep console output concise
         pass
@@ -554,7 +555,8 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
 
 def run_dashboard_server(host: str = "127.0.0.1", port: int = 8080) -> None:
     """Start local interactive HTTP dashboard."""
-    server = HTTPServer((host, port), AstrovetDashboardHandler)
+    server = ThreadingHTTPServer((host, port), AstrovetDashboardHandler)
+    server.daemon_threads = True
     print(f"[ASTROVET Dashboard] Listening at http://{host}:{port}/")
     print("Press Ctrl+C to stop.")
     try:
