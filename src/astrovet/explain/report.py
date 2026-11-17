@@ -18,7 +18,6 @@ import os
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
-import numpy as np
 
 from astrovet.schemas.candidate import CandidateRecord, Ephemeris
 from astrovet.schemas.prediction import AstrovetPrediction, PhysicsDiagnostics
@@ -313,20 +312,14 @@ def vet_and_generate_report(
     raw_lc = read_tess_fits_lightcurve(resolved_fits)
     clean_t, clean_f, clean_fe, q_rep = filter_quality_cadences(raw_lc.time, raw_lc.flux, raw_lc.flux_err, raw_lc.quality)
 
-    # 2. Ephemeris Resolution: Supplied args -> Catalog Lookup (TCE / TOI) -> BLS/TLS Recovery
+    # 2. Ephemeris Resolution: Supplied args -> Catalog Lookup -> BLS/TLS Recovery
     dash_csv = find_default_catalog_path(project_root)
     cat_df = pd.read_csv(dash_csv, low_memory=False) if dash_csv and dash_csv.is_file() else pd.DataFrame()
     matched_row = None
-    if len(cat_df) > 0:
-        id_col = next((c for c in ["canonical_id", "TCE ID", "uid"] if c in cat_df.columns), None)
-        if id_col:
-            m = cat_df[cat_df[id_col] == req_candidate_id]
-            if len(m) > 0:
-                matched_row = m.iloc[0]
-        if matched_row is None and "target_id" in cat_df.columns:
-            m = cat_df[cat_df["target_id"] == req_tic]
-            if len(m) > 0:
-                matched_row = m.iloc[0]
+    if len(cat_df) > 0 and "TCE ID" in cat_df.columns:
+        match_mask = cat_df["TCE ID"] == req_candidate_id
+        if match_mask.any():
+            matched_row = cat_df[match_mask].iloc[0]
 
     resolved_period = period
     resolved_epoch = epoch
@@ -334,63 +327,15 @@ def vet_and_generate_report(
     resolved_depth = depth
     ruwe = 1.0
     label_val = "UNREVIEWED"
-    auto_detected_params = False
-    toi_info = None
 
-    if resolved_period is None or resolved_period <= 0.0:
+    if resolved_period is None:
         if matched_row is not None:
-            per_val = matched_row.get("Orbital Period [day]", matched_row.get("tce_period", matched_row.get("period", 0.0)))
-            if per_val and float(per_val) > 0:
-                resolved_period = float(per_val)
-                resolved_epoch = float(matched_row.get("Transit Epoch [BTJD]", matched_row.get("tce_time0bk", matched_row.get("epoch", 0.0))))
-                resolved_duration = float(matched_row.get("Transit Duration [hour]", matched_row.get("tce_duration", matched_row.get("duration", 0.0))))
-                resolved_depth = float(matched_row.get("Transit Depth [ppm]", matched_row.get("tce_depth", matched_row.get("depth", 0.0))))
-                ruwe = float(matched_row.get("Gaia RUWE", matched_row.get("ruwe", 1.0)))
-                label_val = "PC"
-                auto_detected_params = True
-
-    if resolved_period is None or resolved_period <= 0.0:
-        toi_candidates = (
-            project_root / "data" / "catalogs" / "tess_toi_catalog.csv",
-            project_root / "Datasets" / "tess_lightcurves" / "tess_toi_labels_2026-09-30.csv",
-        )
-        toi_path = next((p for p in toi_candidates if p.is_file()), None)
-        if toi_path:
-            try:
-                toi_df = pd.read_csv(toi_path, low_memory=False)
-                tid_col = next((c for c in ["tid", "TIC ID", "target_id"] if c in toi_df.columns), None)
-                if tid_col:
-                    m_toi = toi_df[toi_df[tid_col].astype(str) == str(req_tic)]
-                    if len(m_toi) > 0:
-                        r_toi = m_toi.iloc[0]
-                        per_col = next((c for c in ["pl_orbper", "Period (days)", "period"] if c in r_toi), None)
-                        if per_col and float(r_toi[per_col]) > 0:
-                            resolved_period = float(r_toi[per_col])
-                            dur_col = next((c for c in ["pl_trandurh", "Duration (hours)", "duration"] if c in r_toi), None)
-                            if dur_col and float(r_toi[dur_col]) > 0:
-                                resolved_duration = float(r_toi[dur_col])
-                            dep_col = next((c for c in ["pl_trandep", "Depth (ppm)", "depth"] if c in r_toi), None)
-                            if dep_col and float(r_toi[dep_col]) > 0:
-                                resolved_depth = float(r_toi[dep_col])
-                            mid_col = next((c for c in ["pl_tranmid", "Transit Epoch [BTJD]", "epoch"] if c in r_toi), None)
-                            if mid_col and float(r_toi[mid_col]) > 0:
-                                t_mid = float(r_toi[mid_col])
-                                if t_mid > 2400000:
-                                    t_mid -= 2457000.0
-                                if len(clean_t) > 0 and resolved_period > 0:
-                                    valid_t = clean_t[~np.isnan(clean_t)]
-                                    if len(valid_t) > 0:
-                                        t_obs_mid = float(np.median(valid_t))
-                                        t_mid = t_mid - round((t_mid - t_obs_mid) / resolved_period) * resolved_period
-                                resolved_epoch = t_mid
-                            label_val = str(r_toi.get("tfopwg_disp", "PC"))
-                            auto_detected_params = True
-                            toi_info = {
-                                "toi": float(r_toi.get("toi", 0.0)),
-                                "disposition": str(r_toi.get("tfopwg_disp", "PC")),
-                            }
-            except Exception as e:
-                print(f"[ASTROVET] TOI auto-detection notice: {e}")
+            resolved_period = float(matched_row.get("Orbital Period [day]", 0.0))
+            resolved_epoch = float(matched_row.get("Transit Epoch [BTJD]", 0.0))
+            resolved_duration = float(matched_row.get("Transit Duration [hour]", 0.0))
+            resolved_depth = float(matched_row.get("Transit Depth [ppm]", 0.0))
+            ruwe = float(matched_row.get("Gaia RUWE", 1.0))
+            label_val = "PC"
 
     # 3. Periodicity Search & Ephemeris Recovery (BLS & TLS)
     periodogram_res: Dict[str, Any] = {}
@@ -630,8 +575,6 @@ def vet_and_generate_report(
         "plot_file": plot_file,
         "lightcurve_plot_file": lightcurve_plot_file,
         "periodogram_results": periodogram_res,
-        "auto_detected_params": auto_detected_params,
-        "toi_info": toi_info,
     }
 
 # Backward compatibility alias

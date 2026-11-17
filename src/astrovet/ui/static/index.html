@@ -389,7 +389,6 @@
               <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">TESS FITS files from SPOC or QLP · up to 50 MB</div>
             </div>
             <div id="uploadSelected" style="display:none; font-family:var(--font-mono); font-size:12px; color:var(--accent-blue); word-break:break-all;"></div>
-            <div id="autoDetectNotice" style="display:none; margin-top:8px; padding:6px 10px; background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); border-radius:6px; font-size:12px; color:#93c5fd; text-align:left;"></div>
           </div>
         </div>
 
@@ -453,7 +452,6 @@
         <div class="simple-summary" aria-live="polite">
           <h3 id="summaryHeading">Your result will appear here</h3>
           <p id="triageExplanation" class="summary-note">Upload a TESS light curve and choose Analyze light curve to begin. ASTROVET helps prioritize candidates; it cannot confirm a planet.</p>
-          <div id="autoDetectResultBanner" style="display:none; margin:10px 0; padding:10px 14px; background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.35); border-radius:8px; font-size:13px; color:#bfdbfe; line-height:1.4;"></div>
           <p id="plainReviewQuick" class="review-quick" style="display:none;"></p>
           <a id="fullReportLink" href="#" style="display:none; color:var(--accent-blue); font-size:13px; margin-top:10px;">Open the detailed report</a>
         </div>
@@ -710,40 +708,14 @@
       }
     });
 
-    async function handleFileSelected(files) {
+    function handleFileSelected(files) {
       if (!files || files.length === 0) return;
       selectedFile = files[0];
       const promptEl = document.getElementById('uploadPrompt');
       const selEl = document.getElementById('uploadSelected');
-      const autoNote = document.getElementById('autoDetectNotice');
       promptEl.style.display = 'none';
       selEl.style.display = 'block';
       selEl.innerText = `Selected: ${selectedFile.name} (${(selectedFile.size / (1024*1024)).toFixed(2)} MB)`;
-      if (autoNote) autoNote.style.display = 'none';
-
-      // Auto-detect ephemeris from NASA catalogs
-      try {
-        const resp = await fetch(`/api/lookup_target?target=${encodeURIComponent(selectedFile.name)}`);
-        const lookup = await resp.json();
-        if (lookup && lookup.found) {
-          if (lookup.period) document.getElementById('period').value = lookup.period.toFixed(5);
-          if (lookup.epoch) document.getElementById('epoch').value = lookup.epoch.toFixed(4);
-          if (lookup.duration) document.getElementById('duration').value = lookup.duration.toFixed(3);
-          if (lookup.depth) document.getElementById('depth').value = Math.round(lookup.depth);
-
-          const candInput = document.getElementById('candidateIdInput');
-          if (!candInput.value && lookup.tic_id) {
-            candInput.value = `${lookup.tic_id}-1-S1`;
-          }
-
-          if (autoNote) {
-            autoNote.style.display = 'block';
-            autoNote.innerHTML = `Auto-detected from ${lookup.source || 'NASA Catalog'}${lookup.toi ? ` (TOI-${lookup.toi} [${lookup.disposition}])` : ''}: Period = <strong>${lookup.period || '—'} d</strong>, Duration = <strong>${lookup.duration || '—'} h</strong>, Depth = <strong>${lookup.depth ? Math.round(lookup.depth) : '—'} ppm</strong>. Ephemeris auto-filled.`;
-          }
-        }
-      } catch (e) {
-        // Fallback to backend auto-detection
-      }
     }
 
     async function runPipelineAction() {
@@ -919,32 +891,6 @@
                 ? 'Score from NASA ExoMiner. High score indicates a strong match to NASA’s planet candidate class.'
                 : 'Score from NASA ExoMiner. Moderate score indicates an uncertain or marginal candidate match.'))
         : (data.baseline_message || 'A reference score was not available for this target.');
-
-      // Auto-detected ephemeris feedback
-      if (data.auto_detected_params) {
-        if (data.resolved_period && !document.getElementById('period').value) {
-          document.getElementById('period').value = data.resolved_period.toFixed(5);
-        }
-        if (data.resolved_epoch && !document.getElementById('epoch').value) {
-          document.getElementById('epoch').value = data.resolved_epoch.toFixed(4);
-        }
-        if (data.resolved_duration && !document.getElementById('duration').value) {
-          document.getElementById('duration').value = data.resolved_duration.toFixed(3);
-        }
-        if (data.resolved_depth && !document.getElementById('depth').value) {
-          document.getElementById('depth').value = Math.round(data.resolved_depth);
-        }
-
-        const autoDetectBanner = document.getElementById('autoDetectResultBanner');
-        if (autoDetectBanner) {
-          const toiTag = data.toi_info ? ` · NASA TOI-${data.toi_info.toi} (${data.toi_info.disposition})` : '';
-          autoDetectBanner.innerHTML = `<strong>Auto-detected Ephemeris:</strong> Orbital Period = <strong>${data.resolved_period ? data.resolved_period.toFixed(4) + ' d' : '—'}</strong>, Length = <strong>${data.resolved_duration ? data.resolved_duration.toFixed(2) + ' h' : '—'}</strong>, Depth = <strong>${data.resolved_depth ? Math.round(data.resolved_depth) + ' ppm' : '—'}</strong>${toiTag}. Verified from NASA reference catalog and applied to light-curve analysis.`;
-          autoDetectBanner.style.display = 'block';
-        }
-      } else {
-        const autoDetectBanner = document.getElementById('autoDetectResultBanner');
-        if (autoDetectBanner) autoDetectBanner.style.display = 'none';
-      }
 
       document.getElementById('valAstrovetScore').innerText = data.astrovet_raw_score !== null ? `${(data.astrovet_raw_score * 100).toFixed(1)} / 100` : 'Not available';
       document.getElementById('valAstrovetMode').innerText = data.score_type === 'fitted_fusion_score' ? 'Trained research model' : 'Rule-based estimate';
@@ -1219,30 +1165,6 @@
         }
       }
     }
-
-    let targetLookupTimeout = null;
-    document.getElementById('candidateIdInput').addEventListener('input', (e) => {
-      clearTimeout(targetLookupTimeout);
-      const val = e.target.value.trim();
-      if (!val || val.length < 5) return;
-      targetLookupTimeout = setTimeout(async () => {
-        try {
-          const resp = await fetch(`/api/lookup_target?target=${encodeURIComponent(val)}`);
-          const lookup = await resp.json();
-          if (lookup && lookup.found) {
-            if (lookup.period && !document.getElementById('period').value) document.getElementById('period').value = lookup.period.toFixed(5);
-            if (lookup.epoch && !document.getElementById('epoch').value) document.getElementById('epoch').value = lookup.epoch.toFixed(4);
-            if (lookup.duration && !document.getElementById('duration').value) document.getElementById('duration').value = lookup.duration.toFixed(3);
-            if (lookup.depth && !document.getElementById('depth').value) document.getElementById('depth').value = Math.round(lookup.depth);
-            const autoNote = document.getElementById('autoDetectNotice');
-            if (autoNote) {
-              autoNote.style.display = 'block';
-              autoNote.innerHTML = `Auto-detected from ${lookup.source || 'NASA Catalog'}${lookup.toi ? ` (TOI-${lookup.toi} [${lookup.disposition}])` : ''}: Period = <strong>${lookup.period || '—'} d</strong>, Duration = <strong>${lookup.duration || '—'} h</strong>, Depth = <strong>${lookup.depth ? Math.round(lookup.depth) : '—'} ppm</strong>. Ephemeris auto-filled.`;
-            }
-          }
-        } catch (err) {}
-      }, 500);
-    });
   </script>
 </body>
 </html>

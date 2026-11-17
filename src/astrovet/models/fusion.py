@@ -299,11 +299,9 @@ class AstrovetFusionModel:
             reason_codes.append("ODD_EVEN_DEPTH_MISMATCH")
         if physics_diag.secondary_eclipse_detected is True:
             reason_codes.append("SIGNIFICANT_SECONDARY_ECLIPSE")
-        bls_sig = (physics_diag.bls_snr or 0.0) >= 6.0
-        tls_sig = (physics_diag.tls_sde or 0.0) >= 7.0
-        if (physics_diag.bls_is_match is False and bls_sig) or (physics_diag.tls_is_match is False and tls_sig):
+        if physics_diag.bls_is_match is False or physics_diag.tls_is_match is False:
             reason_codes.append("PERIODICITY_MISMATCH")
-        if physics_diag.period_search_agreement is False and (bls_sig or tls_sig):
+        if physics_diag.period_search_agreement is False:
             reason_codes.append("BLS_TLS_PERIOD_DISAGREEMENT")
         if not physics_diag.plausibility_all_passed:
             reason_codes.append("UNPHYSICAL_TRANSIT_GEOMETRY")
