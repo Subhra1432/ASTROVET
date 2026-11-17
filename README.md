@@ -109,6 +109,6 @@ tests/               Automated test suite
 
 ---
 
-## ⚖️ Scientific Disclaimer
+## Scientific Disclaimer
 
 ASTROVET is a candidate-prioritization and triage aid for human review. A high model score is **not** a planet confirmation or statistical validation. A low model score is **not** proof of absence. Independent follow-up and expert review remain necessary.
