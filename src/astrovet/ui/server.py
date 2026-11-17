@@ -436,20 +436,21 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
             container_error = raw.get("container_error")
             if b_pred and b_pred.execution_mode == "CONTAINER_PROCESS":
                 container_error = container_error or raw.get("stderr") or raw.get("error")
-            if raw.get("container_notice"):
-                baseline_message = "Docker is not available right now, so the NASA comparison could not run."
-            elif container_error:
-                error_text = str(container_error)
-                if "out-of-memory" in error_text.lower() or "out of memory" in error_text.lower():
-                    baseline_message = "The Docker baseline started but ran out of memory before returning a score."
-                elif "timeout" in error_text.lower():
-                    baseline_message = "The Docker comparison took too long and stopped before returning a score."
+            if baseline_mode == "container":
+                if raw.get("container_notice"):
+                    baseline_message = "Docker is not available right now, so the NASA container comparison could not run."
+                elif container_error:
+                    error_text = str(container_error)
+                    if "out-of-memory" in error_text.lower() or "out of memory" in error_text.lower():
+                        baseline_message = "The Docker baseline started but ran out of memory before returning a score."
+                    elif "timeout" in error_text.lower():
+                        baseline_message = "The Docker comparison took too long and stopped before returning a score."
+                    else:
+                        baseline_message = "The Docker baseline did not return a score. See the detailed report for its run status."
                 else:
-                    baseline_message = "The Docker baseline did not return a score. See the detailed report for its run status."
-            elif baseline_mode == "container":
-                baseline_message = "The Docker baseline did not return a score for this candidate."
+                    baseline_message = "The Docker baseline did not return a score for this candidate."
             else:
-                baseline_message = "This candidate has no matching score in the local ExoMiner reference catalog. The Docker comparison was not run."
+                baseline_message = "This target is not in the official NASA ExoMiner reference catalog (SPOC 2-min S1–S67). ASTROVET's independent pattern and comparison scores are shown."
         is_synthetic = bool(pred.is_synthetic or (b_pred and b_pred.is_synthetic))
 
         pdiag = pred.physics_diagnostics

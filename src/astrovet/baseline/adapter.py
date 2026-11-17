@@ -95,7 +95,19 @@ class ExoMinerBaselineAdapter:
         """
         Query baseline prediction for a single candidate from the published catalog.
         """
-        canonical_id = make_canonical_candidate_id(tic_id, planet_num, sector_run)
+        # Standardize sector string (e.g. 's0039' -> 'S39', '0008' -> 'S8')
+        norm_sector = str(sector_run).strip().upper()
+        if norm_sector.startswith("S"):
+            sec_body = norm_sector[1:]
+        else:
+            sec_body = norm_sector
+        if sec_body.isdigit():
+            norm_sector = f"S{int(sec_body)}"
+        else:
+            norm_sector = f"S{sec_body}"
+
+        canonical_id = make_canonical_candidate_id(tic_id, planet_num, norm_sector)
+        raw_canonical_id = make_canonical_candidate_id(tic_id, planet_num, sector_run)
         
         if self.is_synthetic:
             # Explicit synthetic demonstration fixture
@@ -118,6 +130,15 @@ class ExoMinerBaselineAdapter:
         cat_df = self._load_catalog()
         if len(cat_df) > 0 and "canonical_id" in cat_df.columns:
             matches = cat_df[cat_df["canonical_id"] == canonical_id]
+            if len(matches) == 0 and canonical_id != raw_canonical_id:
+                matches = cat_df[cat_df["canonical_id"] == raw_canonical_id]
+            if len(matches) == 0 and "target_id" in cat_df.columns:
+                tic_matches = cat_df[cat_df["target_id"] == tic_id]
+                plnt_col = "tce_plnt_num" if "tce_plnt_num" in cat_df.columns else "planet_num"
+                if plnt_col in tic_matches.columns:
+                    tic_matches = tic_matches[tic_matches[plnt_col] == planet_num]
+                if len(tic_matches) > 0:
+                    matches = tic_matches
             if len(matches) > 0:
                 row = matches.iloc[0]
                 raw_score = row.get("ExoMiner Score", row.get("score"))

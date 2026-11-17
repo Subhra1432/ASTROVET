@@ -20,6 +20,7 @@ data/checkpoints/
 data/pixel_cutouts/
 data/container_runs/
 data/manifests/*.json
+data/catalogs/
 data/uploads/
 artifacts/
 runs/
