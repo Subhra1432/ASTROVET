@@ -22,6 +22,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from typing import Any, Dict, Optional, Tuple
+import pandas as pd
 
 from astrovet.baseline.adapter import ExoMinerBaselineAdapter
 from astrovet.explain.report import vet_and_generate_report
@@ -108,6 +109,61 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                     self.wfile.write(f.read())
             else:
                 self.send_error(404, "Artifact file not found")
+            return
+
+        elif path == "/api/lookup_target":
+            query = parse_qs(parsed_url.query)
+            target = query.get("target", query.get("tic", [None]))[0]
+            if not target:
+                self._send_json_error(400, "target query parameter required (e.g. TIC or Candidate ID).")
+                return
+
+            import re
+            m = re.search(r"(\d{6,10})", str(target))
+            if not m:
+                self._send_json_success({"found": False, "target": target})
+                return
+
+            tic_int = int(m.group(1))
+            res: Dict[str, Any] = {"found": False, "target": target, "tic_id": tic_int}
+
+            # 1. Check official NASA TOI catalog
+            toi_csv = PROJECT_ROOT / "data" / "catalogs" / "tess_toi_catalog.csv"
+            if toi_csv.is_file():
+                try:
+                    toi_df = pd.read_csv(toi_csv, low_memory=False)
+                    m_toi = toi_df[toi_df["tid"] == tic_int]
+                    if len(m_toi) > 0:
+                        r = m_toi.iloc[0]
+                        epoch_raw = float(r.get("pl_tranmid", 0.0)) if pd.notna(r.get("pl_tranmid")) else 0.0
+                        epoch_btjd = epoch_raw - 2457000.0 if epoch_raw > 2400000 else epoch_raw
+                        res.update({
+                            "found": True,
+                            "source": "NASA TOI",
+                            "toi": float(r.get("toi", 0.0)),
+                            "disposition": str(r.get("tfopwg_disp", "PC")),
+                            "period": float(r.get("pl_orbper", 0.0)) if pd.notna(r.get("pl_orbper")) else None,
+                            "epoch": round(epoch_btjd, 4) if epoch_btjd > 0 else None,
+                            "duration": float(r.get("pl_trandurh", 0.0)) if pd.notna(r.get("pl_trandurh")) else None,
+                            "depth": float(r.get("pl_trandep", 0.0)) if pd.notna(r.get("pl_trandep")) else None,
+                        })
+                except Exception as e:
+                    print(f"[ASTROVET] TOI lookup notice: {e}")
+
+            # 2. Check ExoMiner catalog for reference score
+            exo_csv = PROJECT_ROOT / "data" / "catalogs" / "exominer_s1s67_catalog.csv"
+            if exo_csv.is_file():
+                try:
+                    exo_df = pd.read_csv(exo_csv, low_memory=False)
+                    m_exo = exo_df[exo_df["target_id"] == tic_int]
+                    if len(m_exo) > 0:
+                        r_exo = m_exo.iloc[0]
+                        res["exominer_score"] = float(r_exo["score"]) if pd.notna(r_exo.get("score")) else None
+                        res["found"] = True
+                except Exception as e:
+                    print(f"[ASTROVET] ExoMiner lookup notice: {e}")
+
+            self._send_json_success(res)
             return
 
         elif path == "/api/vet":
@@ -552,6 +608,12 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
                 "period_agreement_diff_percent": pgram.get("period_agreement_diff_percent"),
             },
             "active_reasons": pred.reason_codes,
+            "auto_detected_params": bool(res.get("auto_detected_params", False)),
+            "toi_info": res.get("toi_info"),
+            "resolved_period": getattr(candidate.ephemeris, "period_days", None),
+            "resolved_epoch": getattr(candidate.ephemeris, "epoch_bjd_tdb", None),
+            "resolved_duration": getattr(candidate.ephemeris, "duration_hours", None),
+            "resolved_depth": getattr(candidate.ephemeris, "transit_depth_ppm", None),
         }
 
     def _send_json_error(self, status: int, message: str) -> None:

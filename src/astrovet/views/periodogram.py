@@ -224,6 +224,9 @@ def compute_bls_periodogram(
     # Constrain search range
     upper_period = max_period_days if max_period_days is not None else min(30.0, max(1.0, t_span / 2.0))
     lower_period = max(0.2, min_period_days)
+    if candidate_period and candidate_period > 0 and max_period_days is None:
+        lower_period = max(lower_period, candidate_period * 0.45)
+        upper_period = min(upper_period, candidate_period * 2.1)
     if upper_period <= lower_period:
         upper_period = lower_period + 1.0
 
