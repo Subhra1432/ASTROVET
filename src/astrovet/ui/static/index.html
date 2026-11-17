@@ -885,7 +885,11 @@
       document.getElementById('valBaselineScore').innerText = data.baseline_score !== null ? `${(data.baseline_score * 100).toFixed(1)} / 100` : 'Not available';
       document.getElementById('valBaselineMode').innerText = data.baseline_score !== null ? 'NASA comparison available' : 'No NASA comparison available';
       document.getElementById('noteBaseline').innerText = data.baseline_score !== null
-        ? 'Score from the NASA ExoMiner model. Higher scores indicate a closer match to its planet-like class.'
+        ? (data.baseline_score < 0.1
+            ? 'Score from NASA ExoMiner. A near-zero score indicates NASA classified this signal as an astrophysical false positive (e.g. an eclipsing binary star).'
+            : (data.baseline_score >= 0.5
+                ? 'Score from NASA ExoMiner. High score indicates a strong match to NASA’s planet candidate class.'
+                : 'Score from NASA ExoMiner. Moderate score indicates an uncertain or marginal candidate match.'))
         : (data.baseline_message || 'A reference score was not available for this target.');
 
       document.getElementById('valAstrovetScore').innerText = data.astrovet_raw_score !== null ? `${(data.astrovet_raw_score * 100).toFixed(1)} / 100` : 'Not available';
