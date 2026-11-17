@@ -2,7 +2,7 @@
 param([int]$Port = 8080)
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
-$DataRoot = 'D:\Final Year Projet\ASTROVET_data\artifacts\models\planet_disposition_prototype'
+$DataRoot = 'D:\Final Year Project\ASTROVET_data\artifacts\models\planet_disposition_prototype'
 $SslCheckpoint = Join-Path $DataRoot 'ssl_encoder_trainhosts_v1.npz'
 $FusionModel = Join-Path $DataRoot 'ssl_physics_fusion\astrovet_ssl_physics_fusion_research.joblib'
 foreach ($RequiredPath in @($SslCheckpoint, $FusionModel)) {

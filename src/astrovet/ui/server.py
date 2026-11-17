@@ -48,8 +48,24 @@ def resolve_ssl_checkpoint() -> Optional[Path]:
             raise FileNotFoundError(f"ASTROVET_SSL_CHECKPOINT points to a missing file: {checkpoint}")
         return checkpoint
     candidates = (
+        PROJECT_ROOT / "artifacts" / "models" / "ssl_encoder_trainhosts_v1.npz",
         PROJECT_ROOT / "artifacts" / "models" / "ssl_encoder_real_qlp_trainhosts_v2.npz",
         PROJECT_ROOT / "data" / "checkpoints" / "ssl_transit_encoder.npz",
+    )
+    return next((path for path in candidates if path.is_file()), None)
+
+
+def resolve_fusion_model() -> Optional[Path]:
+    """Resolve an explicitly configured or project-local research fusion head."""
+    configured = os.environ.get("ASTROVET_FUSION_MODEL")
+    if configured:
+        model = Path(configured).expanduser().resolve()
+        if not model.is_file():
+            raise FileNotFoundError(f"ASTROVET_FUSION_MODEL points to a missing file: {model}")
+        return model
+    candidates = (
+        PROJECT_ROOT / "artifacts" / "models" / "fusion_classifier.joblib",
+        PROJECT_ROOT / "artifacts" / "models" / "astrovet_ssl_physics_fusion_research.joblib",
     )
     return next((path for path in candidates if path.is_file()), None)
 
@@ -408,6 +424,7 @@ class AstrovetDashboardHandler(BaseHTTPRequestHandler):
             allow_synthetic=False,
             encoder_mode="ssl",
             ssl_checkpoint=resolve_ssl_checkpoint(),
+            model_artifact=resolve_fusion_model(),
         )
         pred = res["prediction"]
         b_pred = pred.baseline_prediction

@@ -447,8 +447,12 @@ def vet_and_generate_report(
     if model_artifact and Path(model_artifact).is_file():
         fusion = AstrovetFusionModel.load(model_artifact)
     else:
-        default_art = project_root / "artifacts" / "models" / "fusion_classifier.joblib"
-        if default_art.is_file():
+        candidates = (
+            project_root / "artifacts" / "models" / "fusion_classifier.joblib",
+            project_root / "artifacts" / "models" / "astrovet_ssl_physics_fusion_research.joblib",
+        )
+        default_art = next((path for path in candidates if path.is_file()), None)
+        if default_art and default_art.is_file():
             try:
                 fusion = AstrovetFusionModel.load(default_art)
             except Exception:
