@@ -10,7 +10,7 @@ ASTROVET is a candidate-prioritization and research tool for NASA TESS light cur
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 - **Interactive Web Dashboard**: Upload `.fits` / `.fits.gz` light curves from TESS SPOC or QLP and get an instant vetting report.
 - **Dual Periodicity Search**: Automated Box Least Squares (BLS) and Transit Least Squares (TLS) to detect and cross-check periodic signals.
@@ -20,7 +20,7 @@ ASTROVET is a candidate-prioritization and research tool for NASA TESS light cur
 
 ---
 
-## 🚀 Quickstart
+## Quickstart
 
 ### 1. Installation
 
@@ -51,7 +51,7 @@ Open **[http://127.0.0.1:8080](http://127.0.0.1:8080)** in your browser and uplo
 
 ---
 
-## 💻 CLI Commands
+## CLI Commands
 
 ASTROVET includes a full command-line suite:
 
@@ -72,7 +72,7 @@ ASTROVET includes a full command-line suite:
 
 ---
 
-## 🧠 Optional: Groq AI Explanations
+## Optional: Groq AI Explanations
 
 The dashboard can rephrase vetting metrics into plain-language summaries using Groq. Set your API key in your terminal before launching:
 
@@ -88,7 +88,7 @@ export GROQ_API_KEY="your-groq-api-key"
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 src/astrovet/        Core algorithms (BLS/TLS, physics diagnostics, models, UI)
@@ -100,7 +100,7 @@ tests/               Automated test suite
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 - [Upload Workflow Guide](docs/upload_workflow.md)
 - [Model Card & Target Metrics](docs/model_card.md)
